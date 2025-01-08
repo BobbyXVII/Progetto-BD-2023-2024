@@ -1,3 +1,5 @@
+CREATE DATABASE UninaSoccer
+
 CREATE DOMAIN DOMPiedeTipo AS VARCHAR(15)
 CHECK (VALUE IN ('Destro', 'Sinistro', 'Ambidestro'));
 
