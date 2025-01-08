@@ -1,0 +1,1535 @@
+CREATE DOMAIN DOMPiedeTipo AS VARCHAR(15)
+CHECK (VALUE IN ('Destro', 'Sinistro', 'Ambidestro'));
+
+CREATE TABLE Persona (
+ID SERIAL PRIMARY KEY,
+nome VARCHAR(25) NOT NULL,
+cognome VARCHAR(25) NOT NULL,
+data_Nascita DATE NOT NULL,
+nazionalita VARCHAR(30) NOT NULL,
+altezza FLOAT NOT NULL,
+piede DOMPiedeTipo
+);
+
+CREATE TABLE Skills(
+nomeSkill VARCHAR(30) PRIMARY KEY,
+descrizione TEXT
+);
+
+CREATE TABLE Possiede(
+ID SERIAL,
+nomeSkill VARCHAR(30),
+PRIMARY KEY(ID, nomeSkill),
+FOREIGN KEY (ID) REFERENCES PERSONA(ID),
+FOREIGN KEY (nomeSkill) REFERENCES SKILLS(nomeSkill)
+);
+
+CREATE TABLE RUOLO(
+	abbrRuolo VARCHAR(5) PRIMARY KEY,
+	nomeRuolo VARCHAR(40) NOT NULL,
+	descrizione TEXT
+);
+
+CREATE TABLE GIOCA(
+abbrRuolo VARCHAR(5),
+ID SERIAL,
+PRIMARY KEY (ID,abbrRuolo),
+FOREIGN KEY (abbrRuolo) REFERENCES RUOLO(abbrRuolo),
+FOREIGN KEY (ID) REFERENCES PERSONA(ID)
+);
+
+CREATE TABLE Trofeo_Individuale(
+ID_Trofeo_IN VARCHAR(8) PRIMARY KEY,
+nomeAssegnazione VARCHAR(30) NOT NULL,
+dataSvolgimento DATE NOT NULL
+CONSTRAINT ck_trofeo_individuale CHECK (ID_Trofeo_IN LIKE 'IN%')
+);
+
+CREATE DOMAIN DOMTipCompetizione AS VARCHAR(30)
+CHECK (VALUE IN (
+	'Campionato',
+    'Coppa', 
+    'Mondiale', 
+    'Olimpiadi', 
+    'Europei'
+ ));
+ 
+ CREATE TABLE COMPETIZIONE(
+	nomeCompetizione VARCHAR(30),
+	annoSvolgimento VARCHAR(30),
+	tipCompetizione DOMTipCompetizione,
+	nazionalita VARCHAR(30),
+	PRIMARY KEY(nomeCompetizione,annoSvolgimento)
+);
+
+CREATE TABLE STADIO (
+	nomeStadio VARCHAR(30) PRIMARY KEY,
+	capacita INTEGER
+);
+
+CREATE TABLE SQUADRA(
+nomeSquadra VARCHAR(30),
+annoFondazione INTEGER NOT NULL,
+campAppartenenza VARCHAR(30),
+nazionalita VARCHAR(30) NOT NULL,
+nomeStadio VARCHAR(30) NOT NULL,
+PRIMARY KEY(nomeSquadra),
+FOREIGN KEY (nomeStadio) REFERENCES STADIO(nomeStadio)
+);
+
+CREATE TABLE TROFEO_DI_SQUADRA(
+	ID_Trofeo_DS VARCHAR(8) PRIMARY KEY,
+	nomeCompetizione VARCHAR(30) NOT NULL,
+	annoSvolgimento VARCHAR(30),
+	nomeSquadra VARCHAR(30) NOT NULL,
+	FOREIGN KEY (nomeCompetizione,annoSvolgimento) REFERENCES COMPETIZIONE(nomeCompetizione,annoSvolgimento),
+	FOREIGN KEY (nomeSquadra) REFERENCES SQUADRA(nomeSquadra)
+);
+
+CREATE TABLE VINCE (
+    ID_TROFEO_IN VARCHAR(8),
+    ID_TROFEO_DS VARCHAR(8),
+    ID SERIAL,
+    dataVincita DATE NOT NULL,
+    FOREIGN KEY (ID_TROFEO_IN) REFERENCES TROFEO_INDIVIDUALE(ID_TROFEO_IN),
+    FOREIGN KEY (ID_TROFEO_DS) REFERENCES TROFEO_DI_SQUADRA(ID_TROFEO_DS),
+    FOREIGN KEY (ID) REFERENCES PERSONA(ID),
+    CONSTRAINT unique_trofeo_persona UNIQUE (ID_TROFEO_IN, ID_TROFEO_DS, ID)
+);
+
+CREATE TABLE PARTECIPA (
+nomeCompetizione VARCHAR(30),
+annoSvolgimento VARCHAR(30),
+nomeSquadra VARCHAR(30),
+posizioneFinale INTEGER,
+FOREIGN KEY (nomeCompetizione,annoSvolgimento) REFERENCES COMPETIZIONE(nomeCompetizione,annoSvolgimento),
+FOREIGN KEY (nomeSquadra) REFERENCES SQUADRA(nomeSquadra)
+);
+
+CREATE DOMAIN DOMTipologia VARCHAR(15)
+CHECK (VALUE IN('Allenatore','Calciatore','Dirigente'));
+
+CREATE TABLE CARRIERA (
+	ID SERIAL,
+	nomeSquadra VARCHAR(30),
+	dataInizioCarriera DATE NOT NULL,
+	dataFineCarriera DATE,
+	cartelliniRossiAnnuali INTEGER,
+	cartelliniGialliAnnuali INTEGER,
+	tipologia DOMTipologia NOT NULL,
+	infortuniAnnuali INTEGER,
+	goalSubitiAnnuali INTEGER,
+	goalEseguitiAnnuali INTEGER,
+	valoreDiMercato INTEGER,
+	dataRitiro DATE,
+ 	PRIMARY KEY(ID,nomeSquadra,dataInizioCarriera),
+	FOREIGN KEY (nomeSquadra) REFERENCES SQUADRA(nomeSquadra),
+	FOREIGN KEY (ID) REFERENCES PERSONA(ID)
+);
+
+CREATE TABLE ROSA (
+ID_Rosa SERIAL PRIMARY KEY,
+nomeSquadra VARCHAR(30),
+stagione VARCHAR(30),
+FOREIGN KEY (nomeSquadra) REFERENCES SQUADRA(nomeSquadra)
+);
+
+CREATE TABLE PARTITA (
+ID_Partita INTEGER,
+nomeSquadra VARCHAR(30) NOT NULL,
+nomeCompetizione VARCHAR(30) NOT NULL,
+annoSvolgimento VARCHAR(30) NOT NULL,
+ID_Rosa INTEGER NOT NULL,
+inCasa BOOL NOT NULL,
+data DATE NOT NULL,
+ora TIME NOT NULL,
+risultato VARCHAR(30) NOT NULL,
+nomeStadio VARCHAR(30) NOT NULL,
+PRIMARY KEY (ID_Partita,nomeSquadra),
+FOREIGN KEY (nomeSquadra) REFERENCES SQUADRA(nomeSquadra),
+FOREIGN KEY (ID_Rosa) REFERENCES ROSA(ID_Rosa),
+FOREIGN KEY (nomeStadio) REFERENCES STADIO(nomeStadio),
+FOREIGN KEY (nomeCompetizione, annoSvolgimento) REFERENCES COMPETIZIONE(nomeCompetizione, annoSvolgimento)
+);
+
+CREATE TABLE FA_PARTE (
+ID_Rosa SERIAL,
+ID_Calciatore SERIAL,
+titolare BOOL NOT NULL,
+Posizione VARCHAR(40) NOT NULL,
+PRIMARY KEY (ID_Rosa,ID_Calciatore),
+FOREIGN KEY (ID_Calciatore) REFERENCES PERSONA(ID),
+FOREIGN KEY (ID_Rosa) REFERENCES ROSA(ID_Rosa)
+);
+
+
+CREATE TABLE COMPETE (
+ID SERIAL,
+ID_Partita INTEGER,
+nomeSquadra VARCHAR(30) NOT NULL,
+cartellinoRosso BOOL,
+cartelliniGialli INTEGER,
+Infortunato BOOL,
+goalEseguiti INTEGER,
+goalSubiti INTEGER,
+capitano BOOL,
+CONSTRAINT CHeckMaxCartellini CHECK (cartelliniGialli <= 2),
+FOREIGN KEY (ID) REFERENCES PERSONA(ID),
+FOREIGN KEY (ID_Partita,nomeSquadra) REFERENCES PARTITA(ID_Partita,nomeSquadra)
+);
+
+--popolamento
+CREATE OR REPLACE FUNCTION checkCamp()
+RETURNS TRIGGER AS $$
+DECLARE 
+    CampAnalizzato int;
+BEGIN
+    SELECT COUNT(*) INTO CampAnalizzato
+    FROM Competizione
+    WHERE nomeCompetizione = NEW.campAppartenenza 
+    AND Competizione.nazionalita = NEW.nazionalita;
+
+    IF CampAnalizzato = 0 THEN 
+        RAISE EXCEPTION 'Un eccezione è stata violata: Il campionato !';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER checkSquadraCamp 
+BEFORE INSERT ON SQUADRA 
+FOR EACH ROW 
+EXECUTE FUNCTION checkCamp();
+
+CREATE OR REPLACE FUNCTION SearchPosition()
+RETURNS TRIGGER AS $$
+DECLARE
+    CheckPosNEXT int;
+BEGIN
+    SELECT COUNT(*)
+    INTO CheckPosNEXT
+    FROM Partecipa
+    WHERE nomeCompetizione = NEW.nomeCompetizione
+      AND posizioneFinale = NEW.posizioneFinale
+      AND nomeSquadra <> NEW.nomeSquadra;
+
+    IF CheckPosNEXT > 0 THEN
+        RAISE EXCEPTION 'Un eccezione è stata violata: due squadre non possono avere la stessa posizione finale!';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER CheckPosition
+BEFORE INSERT ON Partecipa
+FOR EACH ROW
+EXECUTE FUNCTION SearchPosition();
+
+-- Creare la sequenza
+CREATE SEQUENCE trofeo_di_squadra_seq START 1;
+
+-- Creare la funzione per generare e formattare l'ID
+CREATE OR REPLACE FUNCTION genera_id_trofeo()
+RETURNS VARCHAR(8) AS $$
+DECLARE
+    nuovo_id INT;
+    id_formattato VARCHAR(8);
+BEGIN
+    -- Ottenere il prossimo valore dalla sequenza
+    nuovo_id = nextval('trofeo_di_squadra_seq');
+    
+    -- Formattare il valore come 'DS' seguito da un numero a 6 cifre
+    id_formattato = 'DS' || lpad(nuovo_id::text, 6, '0');
+    
+    RETURN id_formattato;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Creare la funzione trigger
+CREATE OR REPLACE FUNCTION InserisciTrofeoDiSquadra()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.posizioneFinale = 1 THEN
+        INSERT INTO TROFEO_DI_SQUADRA (ID_Trofeo_DS, nomeCompetizione, annoSvolgimento, nomeSquadra)
+        VALUES (genera_id_trofeo(), NEW.nomeCompetizione, NEW.annoSvolgimento, NEW.nomeSquadra);
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Creare il trigger
+CREATE TRIGGER trgInserimentoTrofeoDiSquadra
+AFTER INSERT ON PARTECIPA
+FOR EACH ROW
+EXECUTE FUNCTION InserisciTrofeoDiSquadra();
+
+CREATE OR REPLACE FUNCTION assegna_premio_calciatori()
+RETURNS TRIGGER AS $$
+DECLARE
+    DataFinale DATE;
+    ID_Calciatore INTEGER;
+
+    scansionaGiocatore CURSOR FOR
+        SELECT ID
+        FROM Carriera
+        WHERE nomeSquadra = NEW.nomeSquadra
+          AND CAST(EXTRACT(YEAR FROM dataInizioCarriera) AS INTEGER)
+ <= CAST(SPLIT_PART(NEW.annoSvolgimento, '/', 1) AS INTEGER);
+BEGIN
+    -- Seleziona la data massima della partita
+    SELECT MAX(data) INTO DataFinale
+    FROM PARTITA
+    WHERE nomeSquadra = NEW.nomeSquadra
+      AND annoSvolgimento = NEW.annoSvolgimento
+      AND nomeCompetizione = NEW.nomeCompetizione;
+    
+    -- Apri il cursore
+    OPEN scansionaGiocatore;
+
+    -- Ciclo per ogni calciatore nel cursore
+    LOOP
+        FETCH scansionaGiocatore INTO ID_Calciatore;
+        EXIT WHEN NOT FOUND;
+        -- Inserisce il premio nella tabella VINCE
+        INSERT INTO VINCE (ID_TROFEO_IN, ID_TROFEO_DS, ID, dataVincita)
+        VALUES (NULL, NEW.ID_TROFEO_DS, ID_Calciatore, DataFinale);
+    END LOOP;
+
+    -- Chiudi il cursore
+    CLOSE scansionaGiocatore;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+-- Creazione della trigger associata alla tabella TROFEO_DI_SQUADRA
+CREATE TRIGGER assegna_premio
+AFTER INSERT ON TROFEO_DI_SQUADRA
+FOR EACH ROW
+EXECUTE FUNCTION assegna_premio_calciatori();
+
+
+CREATE OR REPLACE FUNCTION CountID_Partita()
+RETURNS TRIGGER AS $$
+DECLARE
+    CheckTotalID int;
+BEGIN
+    -- Conta il numero di squadre con lo stesso ID_partita
+    SELECT COUNT(*) INTO CheckTotalID
+    FROM Partita
+    WHERE ID_Partita = NEW.ID_partita;
+
+    -- non possono esserci più di due squadre nella stessa partita
+    IF CheckTotalID >= 2 THEN
+        RAISE EXCEPTION 'Solo due squadre possono partecipare alla stessa partita!';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER CheckID_Partita
+BEFORE INSERT ON Partita
+FOR EACH ROW
+EXECUTE FUNCTION CountID_Partita();
+
+
+-- Funzione per il trigger
+CREATE OR REPLACE FUNCTION Check_inCasaCorrect()
+RETURNS TRIGGER AS $$
+DECLARE
+    CheckTotal_inCasa int;
+    StadioSquadra varchar(100);
+BEGIN
+
+    
+    IF NEW.inCasa = TRUE THEN
+      
+        SELECT COUNT(*) INTO CheckTotal_inCasa
+        FROM Partita
+        WHERE inCasa = TRUE
+        AND ID_partita = NEW.ID_Partita;
+
+        
+        IF CheckTotal_inCasa > 0 THEN
+            RAISE EXCEPTION 'Solo una squadra può giocare in casa per la stessa partita!';
+        END IF;
+
+        
+        SELECT S.nomeStadio INTO StadioSquadra
+        FROM SQUADRA AS S
+        WHERE S.nomeSquadra = NEW.nomeSquadra;
+
+       
+        IF NEW.nomeStadio <> StadioSquadra THEN
+            RAISE EXCEPTION 'Lo stadio della partita non è associato alla squadra che gioca in casa';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Definizione del trigger
+CREATE TRIGGER Check_inCasa
+BEFORE INSERT ON Partita
+FOR EACH ROW
+EXECUTE FUNCTION Check_inCasaCorrect();
+
+
+-- Funzione per il trigger
+CREATE OR REPLACE FUNCTION CheckTotalConvocati_Titolari()
+RETURNS TRIGGER AS $$
+DECLARE
+	TotalConvocati INT;
+	CheckAllenatore INT;
+	TotalTitolari INT;
+BEGIN
+    
+	SELECT count(*) INTO TotalConvocati
+	FROM FA_PARTE
+	WHERE ID_Rosa = New.ID_Rosa;
+	
+	SELECT count(*) INTO CheckAllenatore
+	FROM FA_PARTE
+	WHERE ID_Rosa = New.ID_Rosa AND posizione = 'Allenatore';
+	
+	IF TotalConvocati > 21 THEN
+		RAISE EXCEPTION 'Numero massimo di giocatori convocati consentito';
+	END IF;
+	
+	IF TotalConvocati = 21 AND CheckAllenatore = 0 THEN
+		RAISE EXCEPTION 'Allenatore non convocato e numero massimo di giocatori convocabili consentito';
+	END IF;
+	
+	SELECT count(*) INTO TotalTitolari
+	FROM FA_PARTE
+	WHERE ID_Rosa = New.ID_Rosa
+	AND Titolare = TRUE;
+	
+	IF TotalTitolari > 11 THEN
+		RAISE EXCEPTION 'Numero massimo di giocatori titolari consentito';
+	END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Definizione del trigger
+CREATE TRIGGER Check_Convocati_Titolari
+AFTER INSERT ON FA_PARTE
+FOR EACH ROW
+EXECUTE FUNCTION CheckTotalConvocati_Titolari();
+
+CREATE OR REPLACE FUNCTION ExistRoleAndPlay()
+RETURNS TRIGGER AS $$
+DECLARE 
+    PosizioneDaControllare VARCHAR(30);
+	RuoloConfermato VARCHAR(10);
+BEGIN
+	IF NEW.posizione <> 'Allenatore' THEN
+		IF NOT EXISTS (SELECT 1 FROM RUOLO WHERE nomeRuolo = NEW.posizione) THEN
+			RAISE EXCEPTION 'Il ruolo inserito non esiste!';
+		END IF;
+
+		
+		SELECT G.abbrRuolo INTO RuoloConfermato
+		FROM GIOCA AS G
+		JOIN RUOLO AS R ON G.abbrRuolo = R.abbrRuolo
+		WHERE G.ID = NEW.ID_Calciatore AND R.nomeRuolo = NEW.posizione;
+
+		IF RuoloConfermato IS NULL THEN
+			RAISE NOTICE 'Il giocatore non gioca quel ruolo! posizione: %, ID_Calciatore: %', NEW.posizione, NEW.ID_Calciatore;
+
+		END IF;
+	END IF;
+	RETURN NEW;
+	
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER CheckPlayer
+BEFORE INSERT ON FA_PARTE 
+FOR EACH ROW 
+EXECUTE FUNCTION ExistRoleAndPlay();
+
+CREATE OR REPLACE FUNCTION UpdatePlayerCareer()
+RETURNS TRIGGER AS $$
+DECLARE 
+    isGoalKeeper BOOLEAN;
+    goal_segnati INTEGER;
+	goal_subiti_dall_avversaria INTEGER;
+    ResultMatch INTEGER;
+BEGIN
+    IF NEW.cartellinoRosso IS TRUE THEN
+        UPDATE CARRIERA
+        SET cartelliniRossiAnnuali = cartelliniRossiAnnuali + 1
+        WHERE NEW.ID = CARRIERA.ID;
+    END IF;
+
+    IF NEW.cartelliniGialli > 0 THEN
+        UPDATE CARRIERA
+        SET cartelliniGialliAnnuali = cartelliniGialliAnnuali + NEW.cartelliniGialli
+        WHERE NEW.ID = CARRIERA.ID;
+    END IF;
+
+    IF NEW.infortunato IS TRUE THEN
+        UPDATE CARRIERA
+        SET infortuniAnnuali = infortuniAnnuali + 1
+        WHERE NEW.ID = CARRIERA.ID;
+    END IF;
+
+    IF NEW.goalEseguiti > 0 THEN
+        UPDATE CARRIERA
+        SET goalEseguitiAnnuali = goalEseguitiAnnuali + NEW.goalEseguiti
+        WHERE NEW.ID = CARRIERA.ID;
+    END IF;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM GIOCA
+        WHERE NEW.ID = GIOCA.ID
+        AND abbrRuolo = 'POR'
+    ) INTO isGoalKeeper;
+
+    IF isGoalKeeper THEN
+    SELECT 
+    SUM(c1.goalEseguiti),
+    SUM(c2.goalSubiti) INTO goal_segnati, goal_subiti_dall_avversaria
+	FROM PARTITA p1
+	JOIN COMPETE c1 ON p1.ID_Partita = c1.ID_Partita
+	JOIN PARTITA p2 ON p1.ID_Partita = p2.ID_Partita AND p1.nomeSquadra <> p2.nomeSquadra
+	JOIN COMPETE c2 ON p2.ID_Partita = c2.ID_Partita
+	WHERE p1.inCasa = TRUE;
+
+    IF goal_segnati < goal_subiti_dall_avversaria THEN
+		RAISE EXCEPTION 'Il totale di goal subiti non è corretto con il risultato ottenuto dalla partita!';
+	END IF;	
+	
+        UPDATE CARRIERA
+        SET goalSubitiAnnuali = goalSubitiAnnuali + NEW.goalSubiti
+        WHERE NEW.ID = CARRIERA.ID;
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER updateCareers
+AFTER INSERT ON COMPETE
+FOR EACH ROW
+EXECUTE FUNCTION UpdatePlayerCareer();
+
+CREATE OR REPLACE FUNCTION CheckDataCarriera()
+RETURNS TRIGGER AS $$
+BEGIN
+   
+    IF (NEW.dataFineCarriera IS NOT NULL AND NEW.dataFineCarriera < NEW.dataInizioCarriera) THEN
+       RAISE EXCEPTION 'Data fine carriera del Giocatore non valida.';
+    END IF;
+
+    -- Check  dataRitiro is present and valid
+        IF (NEW.dataRitiro IS NOT NULL AND NEW.dataRitiro > NEW.dataFineCarriera) THEN
+			RAISE EXCEPTION 'Data Ritiro non valida.';
+        END IF;
+
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER CheckOnCarriera
+BEFORE INSERT ON CARRIERA
+FOR EACH ROW 
+EXECUTE FUNCTION CheckDataCarriera();
+
+
+CREATE OR REPLACE FUNCTION CheckRitiroPlayerCorrect()
+RETURNS TRIGGER AS $$
+DECLARE
+    calciatore_ritirato_exists BOOLEAN;
+BEGIN
+    -- Verifica se il giocatore non è un 'Calciatore' e controlla che esista un ritiro da 'Calciatore'
+    IF (NEW.tipologia <> 'Calciatore') THEN
+        -- Controlla se esiste un record in CARRIERA per il giocatore con 'tipologia' 'Calciatore' e 'dataRitiro' non nulla
+        SELECT EXISTS (
+            SELECT 1
+            FROM CARRIERA
+            WHERE ID = NEW.ID
+              AND tipologia = 'Calciatore'
+              AND dataRitiro IS NOT NULL
+        ) INTO calciatore_ritirato_exists;
+
+        -- Se non esiste, solleva un'eccezione
+        IF NOT calciatore_ritirato_exists THEN
+            RAISE EXCEPTION 'Il giocatore non risulta Ritirato dal ruolo Calciatore.';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER CheckRitiroPlayer
+BEFORE INSERT ON CARRIERA
+FOR EACH ROW 
+EXECUTE FUNCTION CheckRitiroPlayerCorrect();
+
+CREATE OR REPLACE FUNCTION check_nazionalita()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.tipCompetizione = 'Campionato' AND NEW.nazionalita IS NULL THEN
+        RAISE EXCEPTION 'Il campo nazionalita non può essere NULL per le competizioni di tipo Campionato';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_nazionalita
+BEFORE INSERT OR UPDATE ON COMPETIZIONE
+FOR EACH ROW
+EXECUTE FUNCTION check_nazionalita();
+
+ALTER SEQUENCE public.persona_id_seq RESTART WITH 1;
+SET datestyle = 'YMD';
+
+ --Napoli
+INSERT INTO PERSONA (nome, cognome, data_nascita, nazionalita, altezza, piede)
+VALUES 
+    ('Alex', 'Meret', '1997-03-22', 'Italia', 1.90, 'Sinistro'),
+    ('Pierluigi', 'Gollini', '1995-03-18', 'Italia', 1.94, 'Destro'),
+    ('Nikita', 'Contini', '1996-05-21', 'Ucraina', 1.90, 'Destro'),
+    ('Hubert', 'Dawid', '2002-02-03', 'Polonia', 1.88, 'Destro'),
+    ('Amir', 'Rrahmani', '1994-02-24', 'Kosovo', 1.92, 'Destro'),
+    ('Natan', 'Bernardo de Souza', '2001-02-06', 'Brasile', 1.88, 'Sinistro'),
+    ('Leo', 'Østigård', '1999-11-28', 'Norvegia', 1.82, 'Destro'),
+    ('Juan', 'Jesus', '1991-06-10', 'Brasile', 1.85, 'Sinistro'),
+    ('Mathias', 'Oliveira', '1997-10-31', 'Uruguay', 1.85, 'Sinistro'),
+    ('Mario', 'Rui', '1991-05-27', 'Portogallo', 1.68, 'Sinistro'),
+    ('Giovanni', 'Di Lorenzo', '1993-08-04', 'Italia', 1.83, 'Destro'),
+    ('Pasquale', 'Mazzocchi', '1995-07-27', 'Italia', 1.83, 'Destro'),
+    ('Stanislav', 'Lobotka', '1994-11-25', 'Slovacchia', 1.68, 'Destro'),
+    ('Leander', 'Dendoncker', '1995-04-11', 'Belgio', 1.88, 'Destro'),
+    ('Diego', 'Demme', '1991-11-21', 'Germania', 1.70, 'Destro'),
+    ('Frank', 'Anguissa', '1995-11-16', 'Camerun', 1.84, 'Destro'),
+    ('Piotr', 'Zieliński', '1994-05-20', 'Polonia', 1.80, 'Ambidestro'),
+    ('Jens', 'Cajuste', '1999-08-10', 'Svezia', 1.88, 'Destro'),
+    ('Jesper', 'Lindstrøm', '2000-02-29', 'Danimarca', 1.82, 'Destro'),
+    ('Hamed', 'Traorè', '2000-02-16', 'Costa D avorio', 1.77, 'Destro'),
+    ('Khvicha', 'Kvaratskhelia', '2001-02-12', 'Georgia', 1.83, 'Ambidestro'),
+    ('Matteo', 'Politano', '1993-08-03', 'Italia', 1.71, 'Sinistro'),
+    ('Cyril', 'Ngonge', '2000-05-26', 'Belgio', 1.80, 'Sinistro'),
+    ('Giacomo', 'Raspadori', '2000-02-18', 'Italia', 1.72, 'Destro'),
+    ('Victor', 'Osimhen', '1998-12-29', 'Nigeria', 1.86, 'Destro'),
+    ('Giovanni', 'Simeone', '1995-07-05', 'Argentina', 1.80, 'Destro'),
+    ('Antonio', 'Conte', '1969-07-31', 'Italia', 1.76, 'Destro'),
+    ('Aurelio', 'De Laurentiis', '1949-05-24', 'Italia', 1.75, NULL);
+	
+-- Milan
+
+	INSERT INTO Persona (nome, cognome, data_Nascita, nazionalita, altezza, piede) 
+VALUES
+    ('Mike', 'Maignan', '1995-07-03', 'Francia', 1.91, 'Destro'),
+    ('Marco', 'Sportiello', '1992-05-10', 'Italia', 1.90, 'Destro'),
+    ('Lapo', 'Nava', '2004-01-22', 'Italia', 1.97, 'Destro'),
+    ('Antonio', 'Mirante', '1983-07-08', 'Italia', 1.97, 'Destro'),
+    ('Fikayo', 'Tomori', '1997-12-19', 'Inghilterra', 1.85, 'Destro'),
+    ('Malick', 'Thiaw', '2001-08-08', 'Germania', 1.91, 'Destro'),
+    ('Pierre', 'Kalulu', '2000-06-05', 'Francia', 1.84, 'Destro'),
+    ('Matteo', 'Gabbia', '1999-10-21', 'Italia', 1.84, 'Destro'),
+    ('Simon', 'Kjaer', '1989-03-26', 'Danimarca', 1.90, 'Destro'),
+    ('Mattia', 'Caldara', '1994-05-05', 'Italia', 1.87, 'Destro'),
+    ('Theo', 'Hernandez', '1997-10-06', 'Francia', 1.75, 'Sinistro'),
+    ('Davide', 'Calabria', '1996-12-06', 'Italia', 1.84, 'Destro'),
+    ('Filippo', 'Terracciano', '2003-02-08', 'Italia', 1.86, 'Destro'),
+    ('Alessandro', 'Florenzi', '1991-03-11', 'Italia', 1.73, 'Destro'),
+    ('Ismael', 'Bennacer', '1997-12-01', 'Algeria', 1.77, 'Sinistro'),
+    ('Yacine', 'Adli', '2000-07-29', 'Francia', 1.86, 'Destro'),
+    ('Tijjani', 'Reijnders', '1998-07-29', 'Olanda', 1.85, 'Destro'),
+    ('Ruben', 'Loftus-Cheek', '1996-01-23', 'Inghilterra', 1.91, 'Destro'),
+    ('Yunus', 'Musah', '2002-11-29', 'USA', 1.78, 'Destro'),
+    ('Tommaso', 'Pobega', '1999-07-15', 'Italia', 1.77, 'Sinistro'),
+    ('Rafael', 'Leao', '1999-06-10', 'Portogallo', 1.84, 'Sinistro'),
+    ('Noah', 'Okafor', '2000-05-24', 'Svizzera', 1.85, 'Destro'),
+    ('Christian', 'Pulisic', '1998-09-18', 'USA', 1.82, 'Destro'),
+    ('Samuel', 'Chukwueze', '1999-05-22', 'Nigeria', 1.76, 'Sinistro'),
+    ('Luka', 'Jović', '1997-12-23', 'Serbia', 1.82, 'Destro'),
+    ('Olivier', 'Giroud', '1986-09-30', 'Francia', 1.93, 'Sinistro'),
+    ('Stefano', 'Pioli', '1965-10-20', 'Italia', 1.82, 'Destro'),
+    ('Paolo', 'Maldini', '1968-06-26', 'Italia', 1.88, 'Sinistro');
+
+
+-- Inter
+
+	INSERT INTO PERSONA (nome, cognome, data_nascita, nazionalita, altezza, piede)
+VALUES 
+    ('Yann', 'Sommer', '1988-12-18', 'Svizzera', 1.83, 'Destro'),
+    ('Emil', 'Audero', '1997-06-18', 'Italia', 1.92, 'Destro'),
+    ('Raffaele', 'Di Gennaro', '1993-10-13', 'Italia', 1.88, 'Destro'),
+    ('Alessandro', 'Calligaris', '2005-03-07', 'Italia', 1.85, 'Destro'),
+    ('Alessandro', 'Bastoni', '1999-04-13', 'Italia', 1.90, 'Sinistro'),
+    ('Benjamin', 'Pavard', '1996-03-28', 'Francia', 1.86, 'Sinistro'),
+    ('Yann', 'Bisseck', '2000-11-29', 'Germania, Camerun', 1.96, 'Destro'),
+    ('Stefan', 'De Vrij', '1992-02-05', 'Olanda', 1.89, 'Destro'),
+    ('Francesco', 'Acerbi', '1988-02-10', 'Italia', 1.92, 'Sinistro'),
+    ('Tommaso', 'Guercio', '2005-06-01', 'Polonia, Italia', 1.86, 'Destro'),
+    ('Giacomo', 'Stabile', '2005-04-12', 'Italia', 1.87, 'Sinistro'),
+    ('Federico', 'Dimarco', '1997-11-10', 'Italia', 1.82, 'Sinistro'),
+    ('Matteo', 'Motta', '2005-02-10', 'Italia', 1.92, 'Sinistro'),
+    ('Matteo', 'Darmin', '1989-12-02', 'Italia', 1.83, 'Destro'),
+    ('Hakan', 'Calhanoglu', '1994-02-08', 'Turchia', 1.87, 'Destro'),
+    ('Kristjan', 'Asllani', '2002-03-09', 'Albania', 1.85, 'Destro'),
+    ('Nicolo', 'Barella', '1997-02-07', 'Italia', 1.87, 'Destro'),
+    ('Lucien', 'Agoumé', '2002-02-09', 'Francia, Camerun', 1.85, 'Destro'),
+    ('Aleksander', 'Stankovic', '2005-08-03', 'Lussemburgo, Italia', 1.83, 'Destro'),
+    ('Nicolò', 'Barella', '1997-02-07', 'Italia', 1.82, 'Destro'),
+    ('Davide', 'Frattesi', '1999-09-22', 'Italia', 1.78, 'Destro'),
+    ('Henrikh', 'Mkhitaryan', '1989-01-21', 'Armenia', 1.88, 'Destro'),
+    ('Davy', 'Klaassen', '1993-02-21', 'Olanda', 1.79, 'Destro'),
+    ('Ebenezer', 'Akinsanmiro', '2004-04-18', 'Nigeria', 1.85, 'Sinistro'),
+    ('Denzel', 'Dumfries', '1996-04-18', 'Olanda', 1.91, 'Destro'),
+    ('Tajon', 'Buchanan', '1999-02-08', 'Canada, Giamaica', 1.83, 'Destro'),
+    ('Juan', 'Cuadrado', '1998-05-25', 'Colombia, Italia', 1.76, 'Destro'),
+    ('Carlos', 'Augusto', '1999-01-07', 'Brasile, Italia', 1.84, 'Sinistro'),
+    ('Issiaka', 'Kamate', '2004-08-02', 'Francia', 1.83, 'Destro'),
+    ('Joaquin', 'Correa', '1994-08-13', 'Argentina, Italia', 1.82, 'Destro'),
+    ('Lautaro', 'Martinez', '1997-08-22', 'Argentina', 1.88, 'Destro'),
+    ('Marcus', 'Thuram', '1997-08-06', 'Francia', 1.75, 'Destro'),
+    ('Marko', 'Arnautovic', '1989-04-19', 'Austria, Serbia', 1.90, 'Ambidestro'),
+    ('Alexis', 'Sanchez', '1988-12-19', 'Cile', 1.69, 'Destro'),
+    ('Amadou', 'Sarr', '2004-06-28', 'Italia, Camerun', 1.85, 'Destro'),
+    ('Simone', 'Inzaghi', '1976-04-05', 'Italia', 1.85, 'Destro'),
+    ('Giuseppe', 'Marotta', '1957-03-27', 'Italia', 1.85, NULL);
+
+-- 2023/2024
+INSERT INTO COMPETIZIONE (nomeCompetizione, annoSvolgimento, tipCompetizione, nazionalita)
+VALUES
+    ('Serie A', '2023/2024', 'Campionato', 'Italia'),
+    ('Premier League', '2023/2024', 'Campionato', 'Inghilterra'),
+    ('La Liga', '2023/2024', 'Campionato', 'Spagna'),
+    ('Bundesliga', '2023/2024', 'Campionato', 'Germania'),
+    ('Ligue 1', '2023/2024', 'Campionato', 'Francia'),
+    ('Champions League', '2023/2024', 'Coppa', 'Europa'),
+    ('Europa League', '2023/2024', 'Coppa', 'Europa'),
+    ('Coppa del Mondo', '2023/2024', 'Mondiale', 'Internazionale'),
+    ('Olimpiadi di calcio', '2023/2024', 'Olimpiadi', 'Internazionale'),
+    ('Campionato Europeo', '2023/2024', 'Europei', 'Europa'),
+    ('Coppa Italia', '2023/2024', 'Coppa', 'Italia'),
+    ('FA Cup', '2023/2024', 'Coppa', 'Inghilterra'),
+    ('Copa del Rey', '2023/2024', 'Coppa', 'Spagna'),
+    ('DFB-Pokal', '2023/2024', 'Coppa', 'Germania'),
+    ('Coupe de France', '2023/2024', 'Coppa', 'Francia');
+
+
+INSERT INTO Stadio (nomeStadio, capacita)
+VALUES
+	('Stadio Diego Armando Maradona',56726),
+	('Giuseppe Meazza',75923),
+	('Santiago Bernabéu',81044),
+	('Wembley Stadium',90000);
+	
+INSERT INTO SQUADRA (nomeSquadra, annoFondazione, campAppartenenza, nazionalita, nomeStadio)
+VALUES
+		('SSC Napoli',1926,'Serie A','Italia','Stadio Diego Armando Maradona'),
+		('AC Milan',1899,'Serie A','Italia','Giuseppe Meazza'),
+		('Inter',1908,'Serie A','Italia','Giuseppe Meazza');
+		
+		INSERT INTO skills (nomeSkill, descrizione) 
+VALUES 
+		('Controllo di palla', 'Capacità di ricevere e mantenere il possesso del pallone sotto pressione.'),
+		('Dribbling', 'Abilità di superare gli avversari mantenendo il controllo del pallone.'),
+		('Passaggio', 'Precisione e forza nel passare il pallone ai compagni di squadra.'),
+		('Passaggio corto', 'Precisione e forza nel passare il pallone ai compagni di squadra su brevi distanze.'),
+		('Passaggio lungo', 'Precisione e forza nel passare il pallone ai compagni di squadra su lunghe distanze.'),
+		('Passaggio rasoterra', 'Precisione nel passare il pallone ai compagni di squadra mantenendo il pallone a terra.'),
+		('Passaggio a mezz aria', 'Precisione nel passare il pallone ai compagni di squadra con il pallone a mezz aria.'),
+		('Tiro', 'Precisione e potenza nel tirare in porta.'),
+		('Colpo di testa', 'Utilizzo della testa per passare o tirare il pallone.'),
+		('Cross', 'Capacità di inviare il pallone verso l area di rigore avversaria da una posizione laterale.'),
+		('Stop', 'Fermare il pallone con diverse parti del corpo per prepararsi a una giocata successiva.'),
+		('Controllo orientato', 'Controllare il pallone in modo da prepararsi immediatamente per una giocata successiva.'),
+		('Tackle', 'Intervento per sottrarre il pallone all avversario senza commettere fallo.'),
+		('Posizionamento', 'Comprendere e mantenere la posizione corretta in campo.'),
+		('Movimento senza palla', 'Sapersi smarcare e creare spazi per sé e per i compagni.'),
+		('Lettura del gioco', 'Anticipare le mosse degli avversari e prendere decisioni rapide.'),
+		('Pressing', 'Applicare pressione sugli avversari per recuperare il possesso del pallone.'),
+		('Copertura difensiva', 'Fornire supporto ai compagni e coprire le loro posizioni.'),
+		('Transizioni', 'Passare rapidamente dalla fase difensiva a quella offensiva e viceversa.'),
+		('Velocità', 'Capacità di muoversi rapidamente sul campo.'),
+		('Resistenza', 'Mantenere alti livelli di energia e prestazioni per tutta la durata della partita.'),
+		('Forza', 'Capacità di resistere ai contrasti e di eseguire giocate potenti.'),
+		('Agilità', 'Muoversi rapidamente e cambiare direzione con facilità.'),
+		('Coordinazione', 'Sincronizzare movimenti diversi in modo efficiente.'),
+		('Equilibrio', 'Mantenere il controllo del corpo in situazioni di squilibrio.'),
+		('Concentrazione', 'Mantenere alta l attenzione durante tutta la partita.'),
+		('Calma sotto pressione', 'Prendere decisioni giuste anche in situazioni di stress.'),
+		('Determinazione', 'Continuare a lottare e a dare il massimo anche in situazioni difficili.'),
+		('Leadership', 'Guidare e motivare i compagni di squadra.'),
+		('Comunicazione', 'Trasmettere informazioni in modo chiaro e efficace ai compagni di squadra.'),
+		('Intelligenza calcistica', 'Comprendere il gioco e prendere decisioni che aumentano le probabilità di successo per la squadra.'),
+		('Autocontrollo', 'Gestire le emozioni e mantenere la disciplina durante il gioco.');
+		
+		
+		INSERT INTO possiede (id, nomeSkill) 
+VALUES 
+    -- Alex Meret
+    (1, 'Controllo di palla'), (1, 'Tiro'), (1, 'Passaggio'),
+    
+    -- Pierluigi Gollini
+    (2, 'Colpo di testa'), (2, 'Pressing'), (2, 'Resistenza'),
+    
+    -- Nikita Contini
+    (3, 'Controllo orientato'), (3, 'Passaggio lungo'), (3, 'Tiro'),
+    
+    -- Hubert Dawid
+    (4, 'Tackle'), (4, 'Posizionamento'), (4, 'Velocità'),
+    
+    -- Amir Rrahmani
+    (5, 'Copertura difensiva'), (5, 'Pressing'), (5, 'Passaggio corto'),
+    
+    -- Natan Bernardo de Souza 
+    (6, 'Cross'), (6, 'Movimento senza palla'), (6, 'Tiro'),
+    
+    -- Leo Østigård
+    (7, 'Transizioni'), (7, 'Lettura del gioco'), (7, 'Controllo di palla'),
+    
+    -- Juan Jesus
+    (8, 'Forza'), (8, 'Agilità'), (8, 'Equilibrio'),
+    
+    -- Mathias Oliveira
+    (9, 'Resistenza'), (9, 'Determinazione'), (9, 'Comunicazione'),
+    
+    -- Mario Rui 
+    (10, 'Leadership'), (10, 'Calma sotto pressione'), (10, 'Passaggio a mezz aria'),
+    
+    -- Giovanni Di Lorenzo 
+    (11, 'Stop'), (11, 'Controllo orientato'), (11, 'Pressing'),
+    
+    -- Pasquale Mazzocchi 
+    (12, 'Tiro'), (12, 'Passaggio rasoterra'), (12, 'Coordinazione'),
+    
+    -- Stanislav Lobotka 
+    (13, 'Autocontrollo'), (13, 'Dribbling'), (13, 'Lettura del gioco'),
+    
+    -- Leander Dendoncker
+    (14, 'Posizionamento'), (14, 'Movimento senza palla'), (14, 'Resistenza'),
+    
+    -- Diego Demme
+    (15, 'Velocità'), (15, 'Pressing'), (15, 'Tiro'),
+    
+    -- Frank Anguissa 
+    (16, 'Controllo di palla'), (16, 'Forza'), (16, 'Agilità'),
+    
+    -- Piotr Zieliński
+    (17, 'Intelligenza calcistica'), (17, 'Calma sotto pressione'), (17, 'Comunicazione'),
+    
+    -- Jens Cajuste 
+    (18, 'Lettura del gioco'), (18, 'Movimento senza palla'), (18, 'Resistenza'),
+    
+    -- Jesper Lindstrøm 
+    (19, 'Dribbling'), (19, 'Velocità'), (19, 'Pressing'),
+    
+    -- Hamed Traorè 
+    (20, 'Tiro'), (20, 'Passaggio'), (20, 'Controllo di palla'),
+    
+    -- Khvicha Kvaratskhelia
+    (21, 'Agilità'), (21, 'Forza'), (21, 'Intelligenza calcistica'),
+    
+    -- Matteo Politano 
+    (22, 'Tiro'), (22, 'Cross'), (22, 'Passaggio a mezz aria'),
+    
+    -- Cyril Ngonge 
+    (23, 'Controllo orientato'), (23, 'Movimento senza palla'), (23, 'Calma sotto pressione'),
+    
+    -- Giacomo Raspadori 
+    (24, 'Passaggio corto'), (24, 'Dribbling'), (24, 'Pressing'),
+    
+    -- Victor Osimhen
+    (25, 'Velocità'), (25, 'Forza'), (25, 'Tiro'),
+    
+    -- Giovanni Simeone 
+    (26, 'Colpo di testa'), (26, 'Posizionamento'), (26, 'Leadership'),
+    
+    -- Antonio Conte 
+    (27, 'Leadership'), (27, 'Intelligenza calcistica'), (27, 'Comunicazione');
+	
+	INSERT INTO POSSIEDE (ID, nomeSkill) VALUES
+    (29, 'Controllo di palla'), (29, 'Colpo di testa'), (29, 'Posizionamento'),
+    (30, 'Controllo di palla'), (30, 'Calma sotto pressione'), (30, 'Concentrazione'),
+    (31, 'Controllo di palla'), (31, 'Forza'), (31, 'Tiro'),
+    (32, 'Controllo di palla'), (32, 'Concentrazione'), (32, 'Colpo di testa'),
+    (33, 'Dribbling'), (33, 'Passaggio corto'), (33, 'Cross'),
+    (34, 'Colpo di testa'), (34, 'Tackle'), (34, 'Velocità'),
+    (35, 'Dribbling'), (35, 'Passaggio lungo'), (35, 'Cross'),
+    (36, 'Tackle'), (36, 'Passaggio corto'), (36, 'Colpo di testa'),
+    (37, 'Copertura difensiva'), (37, 'Pressing'), (37, 'Movimento senza palla'),
+    (38, 'Tackle'), (38, 'Passaggio'), (38, 'Lettura del gioco'),
+    (39, 'Dribbling'), (39, 'Passaggio corto'), (39, 'Cross'),
+    (40, 'Controllo orientato'), (40, 'Movimento senza palla'), (40, 'Lettura del gioco'),
+    (41, 'Movimento senza palla'), (41, 'Pressing'), (41, 'Velocità'),
+    (42, 'Lettura del gioco'), (42, 'Pressing'), (42, 'Transizioni'),
+    (43, 'Dribbling'), (43, 'Tiro'), (43, 'Cross'),
+    (44, 'Controllo orientato'), (44, 'Lettura del gioco'), (44, 'Calma sotto pressione'),
+    (45, 'Passaggio lungo'), (45, 'Passaggio rasoterra'), (45, 'Movimento senza palla'),
+    (46, 'Tackle'), (46, 'Copertura difensiva'), (46, 'Pressing'),
+    (47, 'Tackle'), (47, 'Movimento senza palla'), (47, 'Transizioni'),
+    (48, 'Dribbling'), (48, 'Cross'), (48, 'Lettura del gioco'),
+    (49, 'Controllo di palla'), (49, 'Cross'), (49, 'Tiro'),
+    (50, 'Controllo di palla'), (50, 'Dribbling'), (50, 'Passaggio corto'),
+    (51, 'Passaggio lungo'), (51, 'Colpo di testa'), (51, 'Pressing'),
+    (52, 'Controllo di palla'), (52, 'Cross'), (52, 'Movimento senza palla'),
+    (53, 'Controllo orientato'), (53, 'Passaggio lungo'), (53, 'Lettura del gioco'),
+    (54, 'Tiro'), (54, 'Colpo di testa'), (54, 'Posizionamento'),
+    (55, 'Controllo di palla'), (55, 'Passaggio corto'), (55, 'Movimento senza palla'),
+    (56, 'Lettura del gioco'), (56, 'Pressing'), (56, 'Movimento senza palla');
+
+
+INSERT INTO POSSIEDE (ID, nomeSkill) VALUES
+    (57, 'Controllo di palla'), (57, 'Dribbling'), (57, 'Passaggio'), -- Yann Sommer
+    (58, 'Controllo di palla'), (58, 'Tiro'), (58, 'Colpo di testa'), -- Emil Audero
+    (59, 'Controllo di palla'), (59, 'Lettura del gioco'), (59, 'Velocità'), -- Raffaele Di Gennaro
+    (60, 'Dribbling'), (60, 'Passaggio corto'), (60, 'Cross'), -- Alessandro Calligaris
+    (61, 'Tackle'), (61, 'Pressing'), (61, 'Movimento senza palla'), -- Alessandro Bastoni
+    (62, 'Colpo di testa'), (62, 'Tiro'), (62, 'Posizionamento'), -- Benjamin Pavard
+    (63, 'Dribbling'), (63, 'Passaggio lungo'), (63, 'Cross'), -- Yann Bisseck
+    (64, 'Controllo orientato'), (64, 'Lettura del gioco'), (64, 'Calma sotto pressione'), -- Stefan De Vrij
+    (65, 'Movimento senza palla'), (65, 'Pressing'), (65, 'Velocità'), -- Francesco Acerbi
+    (66, 'Tackle'), (66, 'Copertura difensiva'), (66, 'Transizioni'), -- Tommaso Guercio
+    (67, 'Tackle'), (67, 'Movimento senza palla'), (67, 'Resistenza'), -- Giacomo Stabile
+    (68, 'Dribbling'), (68, 'Cross'), (68, 'Lettura del gioco'), -- Federico Dimarco
+    (69, 'Controllo di palla'), (69, 'Cross'), (69, 'Tiro'), -- Matteo Motta
+    (70, 'Controllo di palla'), (70, 'Dribbling'), (70, 'Passaggio corto'), -- Matteo Darmin
+    (71, 'Passaggio lungo'), (71, 'Colpo di testa'), (71, 'Pressing'), -- Hakan Calhanoglu
+    (72, 'Controllo di palla'), (72, 'Cross'), (72, 'Movimento senza palla'), -- Kristjan Asllani
+    (73, 'Controllo orientato'), (73, 'Passaggio lungo'), (73, 'Lettura del gioco'), -- Nicolò Barella
+    (74, 'Tiro'), (74, 'Colpo di testa'), (74, 'Posizionamento'), -- Lucien Agoumé
+    (75, 'Controllo di palla'), (75, 'Passaggio corto'), (75, 'Movimento senza palla'), -- Aleksander Stankovic
+    (76, 'Lettura del gioco'), (76, 'Pressing'), (76, 'Movimento senza palla'), -- Nicolò Barella (duplice)
+    (77, 'Controllo di palla'), (77, 'Colpo di testa'), (77, 'Posizionamento'), -- Davide Frattesi
+    (78, 'Controllo di palla'), (78, 'Concentrazione'), (78, 'Colpo di testa'), -- Henrikh Mkhitaryan
+    (79, 'Dribbling'), (79, 'Passaggio corto'), (79, 'Cross'), -- Davy Klaassen
+    (80, 'Colpo di testa'), (80, 'Tackle'), (80, 'Velocità'), -- Ebenezer Akinsanmiro
+    (81, 'Dribbling'), (81, 'Passaggio lungo'), (81, 'Cross'), -- Denzel Dumfries
+    (82, 'Tackle'), (82, 'Passaggio corto'), (82, 'Colpo di testa'), -- Tajon Buchanan
+    (83, 'Copertura difensiva'), (83, 'Pressing'), (83, 'Movimento senza palla'), -- Juan Cuadrado
+    (84, 'Tackle'), (84, 'Passaggio'), (84, 'Lettura del gioco'), -- Carlos Augusto
+    (85, 'Dribbling'), (85, 'Passaggio corto'), (85, 'Cross'), -- Issiaka Kamate
+    (86, 'Controllo orientato'), (86, 'Movimento senza palla'), (86, 'Lettura del gioco'), -- Joaquin Correa
+    (87, 'Movimento senza palla'), (87, 'Pressing'), (87, 'Velocità'); -- Lautaro Martinez
+
+
+INSERT INTO RUOLO (abbrRuolo, nomeRuolo, Descrizione)
+VALUES
+    ('POR', 'Portiere', 'Il giocatore che ha il compito di difendere la porta.'),
+    ('DIF', 'Difensore', 'Il giocatore che ha il compito di difendere la propria area e impedire agli avversari di segnare.'),
+    ('DC', 'Difensore Centrale', 'Difensore che gioca al centro della difesa'),
+    ('DCD', 'Difensore Centrale Destro', 'Difensore centrale che gioca principalmente sul lato destro del campo.'),
+    ('DCS', 'Difensore Centrale Sinistro', 'Difensore centrale che gioca principalmente sul lato sinistro del campo.'),
+    ('TD', 'Terzino Destro', 'Difensore che gioca principalmente sulla fascia destra.'),
+    ('TS', 'Terzino Sinistro', 'Difensore che gioca principalmente sulla fascia sinistra.'),
+    ('CC', 'Centrocampista Centrale', 'Giocatore che gioca nella parte centrale del campo, spesso con compiti sia difensivi che offensivi.'),
+    ('CDC', 'Centrocampista Difensivo Centrale', 'Centrocampista con compiti principalmente difensivi, situato davanti alla difesa.'),
+    ('COC', 'Centrocampista Offensivo Centrale', 'Centrocampista con compiti principalmente offensivi, situato dietro gli attaccanti.'),
+    ('AD', 'Ala Destra', 'Giocatore offensivo che gioca principalmente sulla fascia destra.'),
+    ('AS', 'Ala Sinistra', 'Giocatore offensivo che gioca principalmente sulla fascia sinistra.'),
+    ('ATT', 'Attaccante', 'Giocatore il cui principale compito è segnare i gol.'),
+    ('ATTDS', 'Attaccante Seconda Punta', 'Attaccante che gioca vicino alla punta principale e si muove tra centrocampo e attacco.'),
+    ('ATTPC', 'Attaccante Punta Centrale', 'Attaccante che gioca principalmente nella posizione centrale dell attacco.');
+	
+	INSERT INTO GIOCA (ID, abbrRuolo)
+VALUES
+	--Portieri
+    (1, 'POR'), -- Alex Meret
+    (2, 'POR'), -- Pierluigi Gollini
+    (3, 'POR'), -- Nikita Contini
+    (4, 'POR'), -- Hubert Dawid
+	
+	--Difensori
+    (5, 'DIF'), (5, 'DCD'), -- Amir Rrahmani
+    (6, 'DIF'), (6, 'DCS'), -- Natan Bernardo de Souza
+    (7, 'DIF'), (7, 'DCD'), -- Leo Østigård
+    (8, 'DIF'), (8, 'DCS'), -- Juan Jesus
+    (9, 'DIF'), (9, 'TS'), -- Mathias Oliveira
+    (10, 'DIF'), (10, 'TS'), -- Mario Rui
+    (11, 'DIF'), (11, 'TD'), -- Giovanni Di Lorenzo
+    (12, 'DIF'), (12, 'TD'), -- Pasquale Mazzocchi
+	
+	--Centrocampisti
+    (13, 'CC'), (13, 'CDC'), -- Stanislav Lobotka
+    (14, 'CC'), (14, 'CDC'), -- Leander Dendoncker
+    (15, 'CC'), (15, 'CDC'), -- Diego Demme
+    (16, 'CC'), (16, 'CDC'), -- Frank Anguissa
+    (17, 'CC'), (17, 'COC'), -- Piotr Zieliński
+    (18, 'CC'), (18, 'CDC'), -- Jens Cajuste
+    (19, 'CC'), (19, 'COC'), -- Jesper Lindstrøm
+    (20, 'CC'), (20, 'COC'), -- Hamed Traorè
+	
+	--Attaccanti
+    (21, 'AS'), (21, 'COC'), -- Khvicha Kvaratskhelia
+    (22, 'AD'), -- Matteo Politano
+    (23, 'AS'), -- Cyril Ngonge
+    (24, 'ATT'), (24, 'ATTDS'), -- Giacomo Raspadori
+    (25, 'ATT'), (25, 'ATTPC'), -- Victor Osimhen
+    (26, 'ATT'), (26, 'ATTPC'), -- Giovanni Simeone
+	
+	-- Allenatore e Dirigente
+	(27,'CC'),	(27,	'AD'); -- Antonio Conte
+	
+	INSERT INTO GIOCA (ID, abbrRuolo)
+VALUES
+    --Portieri
+    (29, 'POR'), -- Mike Maignan
+    (30, 'POR'), -- Marco Sportiello
+    (31, 'POR'), -- Lapo Nava
+    (32, 'POR'), -- Antonio Mirante
+
+    --Difensori
+    (33, 'DIF'), (33, 'DC'), -- Fikayo Tomori
+    (34, 'DIF'),(34, 'DC'), -- Malick Thiaw
+    (35, 'DIF'), (35, 'DC'),-- Pierre Kalulu
+    (36, 'DIF'),(36, 'DC'), -- Matteo Gabbia
+    (37, 'DIF'),(37, 'DC'), -- Simon Kjaer
+    (38, 'DIF'),(38, 'DC'),-- Mattia Caldara
+    (39, 'DIF'), (39, 'TS'),-- Theo Hernandez
+    (40, 'DIF'), (40, 'TD'),-- Davide Calabria
+    (41, 'DIF'), (41, 'TD'),-- Filippo Terracciano
+    (42, 'DIF'), (42, 'TD'),-- Alessandro Florenzi
+
+    --Centrocampisti
+    (43, 'CC'), (43, 'CDC'),-- Ismael Bennacer
+    (44, 'CC'),(44, 'CDC'), -- Yacine Adli
+    (45, 'CC'), (45, 'CDC'),-- Tijjani Reijnders
+    (46, 'CC'), (46, 'CDC'),-- Ruben Loftus-Cheek
+    (47, 'CC'), (47, 'CDC'),-- Yunus Musah
+    (48, 'CC'), (48, 'COC'),-- Tommaso Pobega
+
+    --Attaccanti
+    (49, 'ATT'), (49, 'AS'),-- Rafael Leao
+    (50, 'ATT'), (50, 'AS'),-- Noah Okafor
+    (51, 'ATT'), (51, 'AD'),-- Christian Pulisic
+    (52, 'ATT'), (52, 'AD'),-- Samuel Chukwueze
+    (53, 'ATT'), (53, 'ATTPC'),-- Luka Jović
+    (54, 'ATT'), (54, 'ATTPC'),-- Olivier Giroud
+
+    -- Allenatore e Dirigente
+    (55, 'DIF'),(55, 'DC'), -- Stefano Pioli
+    (56, 'DIF'), (56, 'TS'); -- Paolo Maldini
+
+
+INSERT INTO GIOCA (ID, abbrRuolo)
+VALUES
+    -- Portieri
+    (57, 'POR'), -- Yann Sommer
+    (58, 'POR'), -- Emil Audero
+    (59, 'POR'), -- Raffaele Di Gennaro 
+    (60, 'POR'), -- Alessandro Calligaris
+
+    -- Difensori
+    (61, 'DIF'), (61, 'DC'), -- Alessandro bastoni
+    (62, 'DIF'),(62, 'DC'), -- Benjamin Pavard
+    (63, 'DIF'), (63, 'DC'),-- Yann Bisseck
+    (64, 'DIF'),(64, 'DC'), -- Stefan De Vrij
+    (65, 'DIF'),(65, 'DC'), -- Francesco Acerbi
+    (66, 'DIF'),(66, 'DC'),-- Tommaso Guercio
+    (67, 'DIF'), (67, 'DC'),-- Giacomo Stabile
+    (68, 'DIF'), (68, 'TS'),-- Federico Dimarco
+    (69, 'DIF'), (69, 'TS'),-- Matteo Motta
+    (70, 'DIF'), (70, 'TD'),-- Matteo Darmin
+
+    -- Centrocampisti
+    (71, 'CC'), (71, 'CDC'),-- Hakan Çalhanoglu
+    (72, 'CC'), (72, 'CDC'), -- Kristjan Asllani
+    (73, 'CC'), (73, 'CDC'),-- Lucien Agoumè
+    (74, 'CC'), (74, 'CDC'),-- Aleksander Stankovic
+    (75, 'CC'), (75, 'COC'),-- Nicolò Barella
+    (76, 'CC'), (76, 'COC'),-- Davide Frattesi
+    (77, 'CC'), (77, 'COC'),-- Henrikh Mkhitaryan
+    (78, 'CC'), (78, 'CDC'),-- Davy Klaassen
+    (79, 'CC'), (79, 'CDC'),-- Stefano Sensi
+    (80, 'CC'), (80, 'COC'),-- Ebenzer Akinsanmiro
+    (81, 'CC'), (81, 'COC'),-- denzel Dumfries
+    (82, 'CC'), (82, 'DCD'),-- Tajon Buchanan
+    (83, 'CC'), (83, 'DCD'),-- Juan Cuadrado
+    (84, 'CC'), (84, 'DCS'),-- Carlos Augusto
+    
+    -- Attaccanti
+    (85, 'ATT'), (85, 'AD'),-- Issiaka Kamate
+    (86, 'ATT'), (86, 'ATTDS'),-- Joaquin Correa
+    (87, 'ATT'), (87, 'ATTPC'),-- Lautaro Martinez
+    (88, 'ATT'), (88, 'ATTPC'),-- Marcus Thuram
+    (89, 'ATT'), (89, 'ATTPC'),-- Marko Arnautovic
+    (90, 'ATT'), (90, 'ATTPC'),-- Alexis Sanchez
+    (91, 'ATT'), (91, 'ATTPC'),-- Amadou Sarr
+	(92, 'ATT'); -- Simone Inzaghi
+
+
+INSERT INTO Trofeo_Individuale (ID_Trofeo_IN, nomeAssegnazione, dataSvolgimento) VALUES
+('IN000001', 'Pallone d''Oro', '2024-10-30'),
+('IN000002', 'Scarpa d''Oro', '2024-06-01'),
+('IN000003', 'Miglior Portiere', '2024-10-30'),
+('IN000004', 'Miglior Difensore', '2024-09-24'),
+('IN000005', 'Miglior Centrocampista', '2024-09-24'),
+('IN000006', 'Miglior Attaccante', '2024-09-24'),
+('IN000007', 'Giocatore dell''Anno', '2024-10-17'),
+('IN000008', 'Trofeo Kopa', '2024-10-30'),
+('IN000009', 'Golden Boy', '2024-12-18'),
+('IN000010', 'FIFA World Player', '2024-09-24');
+
+INSERT INTO VINCE (ID_TROFEO_IN, ID_TROFEO_DS, ID, dataVincita) VALUES
+-- Victor Osimhen vince la Scarpa d'Oro
+('IN000002', NULL, 26, '2024-06-01'), 
+-- Alex Meret vince il Miglior Portiere
+('IN000003', NULL, 1, '2024-10-30'), 
+-- Amir Rrahmani vince il Miglior Difensore
+('IN000004', NULL, 5, '2024-09-24'), 
+-- Davide Frattesi vince il Miglior Centrocampista
+('IN000005', NULL, 76, '2024-09-24'), 
+-- Khvicha Kvaratskhelia vince il Miglior Attaccante
+('IN000006', NULL, 22, '2024-09-24'), 
+-- Olivier Giroud vince il Giocatore dell'Anno
+('IN000007', NULL, 54, '2024-10-17'), 
+-- Jens Cajuste vince il Trofeo Kopa
+('IN000008', NULL, 19, '2024-10-30'), 
+-- Matteo Politano vince il Golden Boy
+('IN000009', NULL, 23, '2024-12-18'), 
+-- Ruben Loftus-Cheek vince il FIFA World Player
+('IN000010', NULL, 45, '2024-09-24'),
+-- Rafael Leao vince il Pallone d'Oro
+('IN000001', NULL, 48, '2024-10-30');
+
+
+INSERT INTO PARTECIPA (nomeCompetizione, annoSvolgimento, nomeSquadra, posizioneFinale)
+VALUES
+    -- Serie A 2023/2024
+    ('Serie A', '2023/2024', 'SSC Napoli', 4),
+    ('Serie A', '2023/2024', 'Inter', 6),
+    ('Serie A', '2023/2024', 'AC Milan', 1), --Vincitore
+
+    -- Champions League 2023/2024
+    ('Champions League', '2023/2024', 'SSC Napoli', 1), -- Vincitore
+    ('Champions League', '2023/2024', 'Inter', 2), -- Finalista
+    ('Champions League', '2023/2024', 'AC Milan', 3), -- Semifinale
+
+    -- Coppa Italia 2023/2024
+    ('Coppa Italia', '2023/2024', 'SSC Napoli', 2), -- Finalista
+    ('Coppa Italia', '2023/2024', 'Inter', 1), -- Vincitore
+    ('Coppa Italia', '2023/2024', 'AC Milan', 3); -- Quarti di finale
+
+
+INSERT INTO CARRIERA (ID, nomeSquadra, dataInizioCarriera, dataFineCarriera, cartelliniRossiAnnuali, cartelliniGialliAnnuali, tipologia, infortuniAnnuali, goalSubitiAnnuali, goalEseguitiAnnuali, valoreDiMercato, dataRitiro)
+VALUES
+		-- Portieri
+    (1, 'SSC Napoli', '2018-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 35000000, NULL), -- Alex Meret (Portiere)
+    (2, 'SSC Napoli', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 8000000, NULL), -- Pierluigi Gollini (Portiere)
+    (3, 'SSC Napoli', '2017-08-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL), -- Nikita Contini (Portiere)
+    (4, 'SSC Napoli', '2021-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL), -- Hubert Dawid (Portiere)
+    --Difensori
+    (5, 'SSC Napoli', '2020-09-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL), -- Amir Rrahmani (Difensore centrale)
+    (6, 'SSC Napoli', '2022-08-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 15000000, NULL), -- Natan Bernardo de Souza (Difensore centrale)
+    (7, 'SSC Napoli', '2022-01-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 9000000, NULL), -- Leo Østigård (Difensore centrale)
+    (8, 'SSC Napoli', '2019-02-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 4000000, NULL), -- Juan Jesus (Difensore centrale)
+    (9, 'SSC Napoli', '2022-07-10', NULL, 0, 0, 'Calciatore', 0, 0, 0, 18000000, NULL), -- Mathias Oliveira (Terzino sinistro)
+    (10, 'SSC Napoli', '2017-06-25', NULL, 0, 0, 'Calciatore', 0, 0, 0, 6000000, NULL), -- Mario Rui (Terzino sinistro)
+    (11, 'SSC Napoli', '2019-08-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL), -- Giovanni Di Lorenzo (Terzino destro)
+    (12, 'SSC Napoli', '2022-07-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 6000000, NULL), -- Pasquale Mazzocchi (Terzino destro)
+    --Centrocampisti
+    (13, 'SSC Napoli', '2020-01-20', NULL, 0, 0, 'Calciatore', 0, 0, 0, 30000000, NULL), -- Stanislav Lobotka (Centrocampista)
+    (14, 'SSC Napoli', '2022-09-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL), -- Leander Dendoncker (Centrocampista)
+    (15, 'SSC Napoli', '2016-01-05', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2000000, NULL), -- Diego Demme (Centrocampista)
+    (16, 'SSC Napoli', '2021-08-20', NULL, 0, 0, 'Calciatore', 0, 0, 0, 30000000, NULL), -- Frank Anguissa (Centrocampista)
+    (17, 'SSC Napoli', '2016-09-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 40000000, NULL), -- Piotr Zieliński (Centrocampista)
+    (18, 'SSC Napoli', '2022-08-05', NULL, 0, 0, 'Calciatore', 0,0, 0, 15000000, NULL), -- Jens Cajuste (Centrocampista)
+    (19, 'SSC Napoli', '2022-07-20', NULL, 0, 0, 'Calciatore', 0, 0, 0, 28000000, NULL), -- Jesper Lindstrøm (Centrocampista)
+    (20, 'SSC Napoli', '2022-07-25', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL), -- Hamed Traorè (Centrocampista)
+    -- Attaccanti
+    (21, 'SSC Napoli', '2022-07-05', NULL, 0, 0, 'Calciatore', 0, 0, 0, 85000000, NULL), -- Khvicha Kvaratskhelia (Attaccante)
+    (22, 'SSC Napoli', '2019-07-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 15000000, NULL), -- Matteo Politano (Attaccante)
+    (23, 'SSC Napoli', '2022-----07-10', NULL, 0, 0, 'Calciatore', 0, 0, 0, 10000000, NULL), -- Cyril Ngonge (Attaccante)
+    (24, 'SSC Napoli', '2022-07-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 35000000, NULL), -- Giacomo Raspadori (Attaccante)
+    (25, 'SSC Napoli', '2020-07-10', NULL, 0, 0, 'Calciatore', 0, 0, 0, 120000000, NULL), -- Victor Osimhen (Attaccante)
+    (26, 'SSC Napoli', '2022-07-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 15000000, NULL), -- Giovanni Simeone (Attaccante)
+    -- Allenatore e Dirigente
+	(27, 'Inter', '2004-05-10', '2006-03-13',0,0,'Calciatore', 0, 0, 0, 6000000, '2006-03-13'),
+    (27, 'SSC Napoli', '2022-06-10', NULL, 0, 0, 'Allenatore', 0, 0, 0, 5000000, '2006-03-13'); -- Antonio Conte (Allenatore)
+
+
+
+INSERT INTO CARRIERA (ID, nomeSquadra, dataInizioCarriera, dataFineCarriera, cartelliniRossiAnnuali, cartelliniGialliAnnuali, tipologia, infortuniAnnuali, goalSubitiAnnuali, goalEseguitiAnnuali, valoreDiMercato, dataRitiro) 
+VALUES
+    -- Portieri
+    (29, 'AC Milan', '2021-08-25', NULL, 0, 0, 'Calciatore', 0, 0, 0, 45000000, NULL),
+    (30, 'AC Milan', '2022-06-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2500000, NULL),
+    (31, 'AC Milan', '2022-09-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL),
+    (32, 'AC Milan', '2020-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 100000, NULL),
+
+    -- Difensori
+    (33, 'AC Milan', '2021-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL),
+    (34, 'AC Milan', '2022-01-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 20000000, NULL),
+    (35, 'AC Milan', '2020-09-30', NULL, 0, 0, 'Calciatore', 0, 0, 0, 18000000, NULL),
+    (36, 'AC Milan', '2019-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1500000, NULL),
+    (37, 'AC Milan', '2020-10-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 4000000, NULL),
+    (38, 'AC Milan', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2000000, NULL),
+    (39, 'AC Milan', '2019-07-06', NULL, 0, 0, 'Calciatore', 0, 0, 0, 60000000, NULL),
+    (40, 'AC Milan', '2018-01-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 30000000, NULL),
+    (41, 'AC Milan', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL),
+    (42, 'AC Milan', '2022-02-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2500000, NULL),
+
+    -- Centrocampisti
+    (43, 'AC Milan', '2022-01-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 40000000, NULL),
+    (44, 'AC Milan', '2021-07-30', NULL, 0, 0, 'Calciatore', 0, 0, 0, 8000000, NULL),
+    (45, 'AC Milan', '2021-08-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL),
+    (46, 'AC Milan', '2022-04-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 20000000, NULL),
+    (47, 'AC Milan', '2021-12-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 15000000, NULL),
+    (48, 'AC Milan', '2019-07-10', NULL, 0, 0, 'Calciatore', 0, 0, 0, 10000000, NULL),
+
+    -- Attaccanti
+    (49, 'AC Milan', '2018-08-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 90000000, NULL),
+    (50, 'AC Milan', '2020-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 30000000, NULL),
+    (51, 'AC Milan', '2022-03-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL),
+    (52, 'AC Milan', '2022-06-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 22000000, NULL),
+    (53, 'AC Milan', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 12000000, NULL),
+    (54, 'AC Milan', '2021-01-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 3000000, NULL),
+
+    -- Allenatore e dirigente
+	(55, 'Inter','1992-05-30','2007-07-03',0, 0, 'Calciatore', 0, 0, 0, 2000000, '2007-07-03'),
+    (55, 'AC Milan', '2019-09-01', NULL, 0, 0, 'Allenatore', 0, 0, 0, 5000000, '2007-07-03'),
+	
+	(56, 'AC Milan','1990-02-23','2009-06-29',0, 0, 'Calciatore', 0, 0, 0, 8000000, '2009-06-29'),
+    (56, 'AC Milan', '1985-07-01', '2009-06-30', 0, 0, 'Dirigente', 0, 0, 0, 10000000, '2009-06-29');
+
+
+
+INSERT INTO CARRIERA (ID, nomeSquadra, dataInizioCarriera, dataFineCarriera, cartelliniRossiAnnuali, cartelliniGialliAnnuali, tipologia, infortuniAnnuali, goalSubitiAnnuali, goalEseguitiAnnuali, valoreDiMercato, dataRitiro) 
+VALUES
+    -- Portieri
+    (57, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 5000000, NULL),
+    (58, 'Inter', '2022-08-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 4000000, NULL),
+    (59, 'Inter', '2020-09-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL),
+    (60, 'Inter', '2021-07-15', NULL, 0, 0, 'Calciatore', 0, 0, 0, 500000, NULL),
+
+    -- Difensori
+    (61, 'Inter', '2019-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 45000000, NULL),
+    (62, 'Inter', '2022-08-31', NULL, 0, 0, 'Calciatore', 0, 0, 0, 40000000, NULL),
+    (63, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2000000, NULL),
+    (64, 'Inter', '2018-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 8000000, NULL),
+    (65, 'Inter', '2020-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 3000000, NULL),
+    (66, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL),
+    (67, 'Inter', '2022-09-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 800000, NULL),
+    (68, 'Inter', '2020-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 25000000, NULL),
+    (69, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2000000, NULL),
+    (70, 'Inter', '2019-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL),
+
+    -- Centrocampisti
+    (71, 'Inter', '2017-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 35000000, NULL),
+    (72, 'Inter', '2021-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 10000000, NULL),
+    (73, 'Inter', '2019-08-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2000000, NULL),
+    (74, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 500000, NULL),
+    (75, 'Inter', '2015-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 70000000, NULL),
+    (76, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 20000000, NULL),
+    (77, 'Inter', '2016-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 8000000, NULL),
+    (78, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 5000000, NULL),
+    (79, 'Inter', '2018-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 3000000, NULL),
+    (80, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1000000, NULL),
+    (81, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 5000000, NULL),
+    (82, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 8000000, NULL),
+    (83, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 3000000, NULL),
+    (84, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 12000000, NULL),
+
+    -- Attaccanti
+    (85, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 1500000, NULL),
+    (86, 'Inter', '2018-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 3000000, NULL),
+    (87, 'Inter', '2016-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 85000000, NULL),
+    (88, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 40000000, NULL),
+    (89, 'Inter', '2015-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 5000000, NULL),
+    (90, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 7000000, NULL),
+    (91, 'Inter', '2022-07-01', NULL, 0, 0, 'Calciatore', 0, 0, 0, 2000000, NULL),
+
+    -- Allenatore
+	(92, 'Inter','1993-04-10','2010-09-12',0, 0, 'Calciatore', 0, 0, 0, 3000000, '2010-09-12'),
+    (92, 'Inter', '2021-06-01', NULL, 0, 0, 'Allenatore', 0, 0, 0, 0, '2010-09-12');
+
+
+INSERT INTO ROSA (nomeSquadra, Stagione)
+VALUES
+('SSC Napoli','2023/2024'),
+('AC Milan','2023/2024'),
+('Inter', '2023/2024');
+
+
+
+--NAPOLI
+INSERT INTO FA_PARTE (ID_Rosa, ID_Calciatore, titolare, Posizione)
+VALUES
+    (1, 1,TRUE, 'Portiere'), -- Alex Meret
+    (1, 2,FALSE, 'Portiere'), -- Pierluigi Gollini
+    (1, 5,TRUE, 'Difensore'), -- Amir Rrahmani
+    (1, 6,TRUE, 'Difensore'), -- Natan Bernardo de Souza
+    (1, 8,FALSE, 'Difensore Centrale Sinistro'), -- Juan Jesus
+    (1, 9,TRUE, 'Terzino Sinistro'), -- Mathias Oliveira
+    (1, 10,FALSE, 'Terzino Sinistro'), -- Mario Rui
+    (1, 11,TRUE, 'Terzino Destro'), -- Giovanni Di Lorenzo
+    (1, 12,FALSE, 'Terzino Destro'), -- Pasquale Mazzocchi
+    (1, 13,TRUE, 'Centrocampista Difensivo Centrale'), -- Stanislav Lobotka
+    (1, 15,FALSE, 'Centrocampista Centrale'), -- Diego Demme
+    (1, 16,TRUE, 'Centrocampista Centrale'), -- Frank Anguissa
+    (1, 17,TRUE, 'Centrocampista Centrale'), -- Piotr Zieliński
+    (1, 18,FALSE, 'Centrocampista Centrale'), -- Jens Cajuste
+    (1, 20,TRUE, 'Centrocampista Offensivo Centrale'), -- Hamed Traorè
+    (1, 21,TRUE, 'Ala Sinistra'), -- Khvicha Kvaratskhelia
+    (1, 22,FALSE, 'Ala Destra'), -- Matteo Politano
+    (1, 23,FALSE, 'Ala Sinistra'), -- Cyril Ngonge
+    (1, 25,TRUE, 'Attaccante Punta Centrale'), -- Victor Oshimhen
+    (1, 26,FALSE, 'Attaccante Punta Centrale'), -- Giovanni Simeone
+    (1, 27,FALSE, 'Allenatore'); -- Antonio Conte
+
+-- MILAN
+INSERT INTO FA_PARTE (ID_Rosa, ID_Calciatore, titolare, Posizione)
+VALUES
+    (2, 29, TRUE, 'Portiere'), -- Mike Maignan
+    (2, 30, FALSE, 'Portiere'), -- Marco Sportiello
+    (2, 33, TRUE, 'Difensore Centrale'), -- Fikayo Tomori
+    (2, 35, TRUE, 'Difensore Centrale'), -- Pierre Kalulu
+    (2, 37, FALSE, 'Difensore Centrale'), -- Simon Kjaer
+    (2, 39, TRUE, 'Terzino Sinistro'), -- Theo Hernandez
+    (2, 40, TRUE, 'Terzino Destro'), -- Davide Calabria
+    (2, 42, FALSE, 'Terzino Destro'), -- Alessandro Florenzi
+    (2, 43, TRUE, 'Centrocampista Centrale'), -- Ismael Bennacer
+    (2, 44, FALSE, 'Centrocampista Centrale'), -- Yacine Adli
+    (2, 45, FALSE, 'Centrocampista Centrale'), -- Tijjani Reijnders
+    (2, 46, TRUE, 'Centrocampista Centrale'), -- Ruben Loftus-Cheek
+    (2, 47, TRUE, 'Centrocampista Centrale'), -- Yunus Musah
+    (2, 48, FALSE, 'Centrocampista Offensivo Centrale'), -- Tommaso Pobega
+    (2, 49, TRUE, 'Attaccante'), -- Rafael Leao
+    (2, 50, FALSE, 'Ala Sinistra'), -- Noah Okafor
+    (2, 51, TRUE, 'Ala Destra'), -- Christian Pulisic
+    (2, 52, FALSE, 'Ala Destra'), -- Samuel Chukwueze
+    (2, 53, TRUE, 'Attaccante Punta Centrale'), -- Luka Jovic
+    (2, 54, FALSE, 'Attaccante Punta Centrale'), -- Olivier Giroud
+    (2, 55, FALSE, 'Allenatore'); -- Stefano Pioli
+
+-- INTER
+INSERT INTO FA_PARTE (ID_Rosa, ID_Calciatore, titolare, Posizione)
+VALUES
+    (3, 57, TRUE, 'Portiere'), -- Yann Sommer
+    (3, 58, FALSE, 'Portiere'), -- Emil Audero
+    (3, 64, TRUE, 'Difensore Centrale'), -- Stefan De Vrij
+    (3, 65, TRUE, 'Difensore Centrale'), -- Francesco Acerbi
+    (3, 62, TRUE, 'Difensore Centrale'), -- Benjamin Pavard
+    (3, 68, TRUE, 'Terzino Sinistro'), -- Federico Dimarco
+    (3, 69, FALSE, 'Terzino Sinistro'), -- Matteo Motta
+    (3, 70, FALSE, 'Terzino Destro'), -- Matteo Darmin
+    (3, 75, TRUE, 'Centrocampista Centrale'), -- Nicolò Barella
+    (3, 77, TRUE, 'Centrocampista Centrale'), -- Henrikh Mkhitaryan
+    (3, 79, FALSE, 'Centrocampista Centrale'), -- Stefano Sensi
+    (3, 76, FALSE, 'Centrocampista Centrale'), -- Davide Frattesi
+    (3, 78, TRUE, 'Centrocampista Centrale'), -- Davy Klassen
+    (3, 72, FALSE, 'Centrocampista Centrale'), -- Kristjan Asllani
+    (3, 84, TRUE, 'Centrocampista Centrale'), -- Carlos Augusto
+    (3, 91, FALSE, 'Attaccante'), -- Amadou Sarr
+    (3, 87, TRUE, 'Attaccante'), -- Lautaro Martinez
+    (3, 90, FALSE, 'Attaccante'), --Alexis Sanchez
+    (3, 88, TRUE, 'Attaccante'), -- Marcus Thuram
+    (3, 86, FALSE, 'Attaccante'), -- Joaquin Correa
+    (3, 92, FALSE, 'Allenatore'); -- Simone Inzaghi
+	
+	
+-- 'Serie A' 2023/2024
+
+-- SSC Napoli vs AC Milan
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento, ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (1, 'SSC Napoli', 'Serie A', '2023/2024', 1, TRUE, '2023-09-10', '20:45:00', '0','Stadio Diego Armando Maradona'),
+    (1, 'AC Milan', 'Serie A', '2023/2024', 2, FALSE, '2023-09-10', '20:45:00', '1','Stadio Diego Armando Maradona');
+
+-- Inter vs SSC Napoli
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento,  ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (2, 'Inter', 'Serie A', '2023/2024', 3, TRUE, '2023-10-15', '20:45:00', '1','Giuseppe Meazza'),
+    (2, 'SSC Napoli', 'Serie A', '2023/2024', 1, FALSE, '2023-10-15', '20:45:00', '3','Giuseppe Meazza');
+
+-- AC Milan vs Inter
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento,  ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (3, 'AC Milan', 'Serie A', '2023/2024', 2, TRUE, '2023-11-20', '20:45:00', '0','Giuseppe Meazza'),
+    (3, 'Inter', 'Serie A', '2023/2024', 3, FALSE, '2023-11-20', '20:45:00', '2','Giuseppe Meazza');
+   
+
+-- 'Champions League' 2023/2024
+
+-- Semifinale: Inter vs AC Milan
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento,  ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (4, 'Inter', 'Champions League', '2023/2024', 3, FALSE, '2024-04-10', '21:00:00', '0','Santiago Bernabéu'),
+    (4, 'AC Milan', 'Champions League', '2023/2024', 2, FALSE, '2024-04-10', '21:00:00', '2','Santiago Bernabéu');
+
+-- Finale: AC Milan vs SSC Napoli (vincitore finale)
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento,  ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (5, 'AC Milan', 'Champions League', '2023/2024', 2, FALSE, '2024-05-29', '21:00:00', '2','Wembley Stadium'),
+    (5, 'SSC Napoli', 'Champions League', '2023/2024', 1, FALSE, '2024-05-29', '21:00:00', '3','Wembley Stadium'); 
+
+
+-- Coppa Italia 2023/2024
+
+-- Semifinale: Inter vs Milan
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento,  ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (6, 'Inter', 'Coppa Italia', '2023/2024', 3, FALSE, '2024-04-14', '20:45', '3','Stadio Diego Armando Maradona'),
+    (6, 'AC Milan', 'Coppa Italia', '2023/2024', 2, FALSE, '2024-04-14', '20:45', '1','Stadio Diego Armando Maradona'); 
+
+-- Finale: Inter vs SSC Napoli (vincitore finale)
+INSERT INTO PARTITA (ID_Partita, nomeSquadra, nomeCompetizione, annoSvolgimento, ID_Rosa, inCasa, data, ora, risultato, nomeStadio)
+VALUES 
+    (7, 'Inter', 'Coppa Italia', '2023/2024', 3, FALSE, '2024-05-19', '21:00', '2','Giuseppe Meazza'),
+    (7, 'SSC Napoli', 'Coppa Italia', '2023/2024', 1, FALSE, '2024-05-19', '21:00', '1','Giuseppe Meazza');
+
+
+
+INSERT INTO PARTECIPA (nomeCompetizione, annoSvolgimento, nomeSquadra, posizioneFinale)
+VALUES
+    -- Serie A 2023/2024
+    ('Serie A', '2023/2024', 'SSC Napoli', 4),
+    ('Serie A', '2023/2024', 'Inter', 6),
+    ('Serie A', '2023/2024', 'AC Milan', 1), --Vincitore
+
+    -- Champions League 2023/2024
+    ('Champions League', '2023/2024', 'SSC Napoli', 1), -- Vincitore
+    ('Champions League', '2023/2024', 'Inter', 2), -- Finalista
+    ('Champions League', '2023/2024', 'AC Milan', 3), -- Semifinale
+
+    -- Coppa Italia 2023/2024
+    ('Coppa Italia', '2023/2024', 'SSC Napoli', 2), -- Finalista
+    ('Coppa Italia', '2023/2024', 'Inter', 1), -- Vincitore
+    ('Coppa Italia', '2023/2024', 'AC Milan', 3); -- Quarti di finale
+
+INSERT INTO COMPETE (ID, ID_Partita, nomeSquadra, cartellinoRosso, cartelliniGialli, Infortunato, goalEseguiti, goalSubiti, capitano)
+VALUES
+	-- AC Milan vs Inter - Serie A
+    (29, 3, 'AC Milan',FALSE, 0, FALSE, 0, 3,TRUE), -- Mike Maignan
+    (33, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Fikayo Tomori
+    (36, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Matteo Gabbia
+    (39, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Theo Hernandez
+    (40, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Davide Calabria
+    (42, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Alessandro Florenzi
+    (45, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Tijjani Reijnders
+    (48, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Tommaso Pobega
+    (49, 3, 'AC Milan',FALSE, 1, FALSE, 0, 0,FALSE), -- Rafael Leao
+    (51, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Christian Pulisic
+    (54, 3, 'AC Milan',FALSE, 0, FALSE, 1, 0,FALSE), -- Olivier Giroud
+    
+    (57, 3, 'Inter',FALSE, 0, FALSE, 0, 1, TRUE), -- Yann Sommer
+    (63, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
+    (65, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Francesco Acerbi
+    (66, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
+    (68, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Federico Dimarco
+    (71, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Hakan Çalhanoglu
+    (75, 3, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Nicolò Barella
+    (76, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Frattesi
+    (81, 3, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Denzel Dumfries
+    (88, 3, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Marcus Thuram
+    (89, 3, 'Inter',FALSE, 1, FALSE, 1, 0, FALSE), -- Marko Arnautovic
+
+-- Semifinale: Inter vs AC Milan - Champions League
+    (57, 4, 'Inter',FALSE, 0, FALSE, 0, 2, TRUE), -- Yann Sommer
+    (63, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
+    (65, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Francesco Acerbi
+    (66, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
+    (68, 4, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Federico Dimarco
+    (71, 4, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Hakan Çalhanoglu
+    (75, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Nicolò Barella
+    (76, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Frattesi
+    (81, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Denzel Dumfries
+    (88, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marcus Thuram
+    (89, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marko Arnautovic
+    
+    (29, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, TRUE), -- Mike Maignan
+    (33, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Fikayo Tomori
+    (36, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Matteo Gabbia
+    (39, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Theo Hernandez
+    (40, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Calabria
+    (42, 4, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Alessandro Florenzi
+    (45, 4, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tijjani Reijnders
+    (48, 4, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tommaso Pobega
+    (49, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Rafael Leao
+    (51, 4, 'AC Milan',FALSE, 0, FALSE, 1, 0, FALSE), -- Christian Pulisic
+    (54, 4, 'AC Milan',FALSE, 0, FALSE, 1, 0, FALSE), -- Olivier Giroud
+    
+ -- Finale: AC Milan vs SSC Napoli (vincitore finale)
+    (29, 5, 'AC Milan',FALSE, 0, FALSE, 0, 5, TRUE), -- Mike Maignan
+    (33, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Fikayo Tomori
+    (36, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Matteo Gabbia
+    (39, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Theo Hernandez
+    (40, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Calabria
+    (42, 5, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Alessandro Florenzi
+    (45, 5, 'AC Milan',FALSE, 0, FALSE, 1, 0, FALSE), -- Tijjani Reijnders
+    (48, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Pobega
+    (49, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Rafael Leao
+    (51, 5, 'AC Milan',FALSE, 1, FALSE, 1, 0, FALSE), -- Christian Pulisic
+    (54, 5, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Olivier Giroud
+    
+    (1, 5, 'SSC Napoli',FALSE, 0, FALSE, 0, 2, FALSE), -- Alex Meret
+    (7, 5, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Leo Østigård
+    (8, 5, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Juan Jesus
+    (9, 5, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Mathias Oliveira
+    (11, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, TRUE), -- Giovanni Di Lorenzo
+    (13, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, FALSE), -- Stanislav Lobotka
+    (16, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, FALSE), -- Frank Anguissa
+    (18, 5, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Jens Cajuste
+    (21, 5, 'SSC Napoli',FALSE, 1, FALSE, 1, 0, FALSE), -- Khvicha Kvaratskhelia
+    (22, 5, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Matteo Politano
+    (26, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, FALSE), -- Giovanni Simeone
+    
+
+
+-- Semifinale: Inter vs Milan
+    (57, 6, 'Inter',FALSE, 0, FALSE, 0, 1, TRUE), -- Yann Sommer
+    (63, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
+    (65, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Francesco Acerbi
+    (66, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
+    (68, 6, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Federico Dimarco
+    (71, 6, 'Inter',FALSE, 1, FALSE, 1, 0, FALSE), -- Hakan Çalhanoglu
+    (75, 6, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Nicolò Barella
+    (76, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Frattesi
+    (81, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Denzel Dumfries
+    (88, 6, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Marcus Thuram
+    (89, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marko Arnautovic
+   
+    (29, 6, 'AC Milan',FALSE, 0, FALSE, 0, 3, TRUE), -- Mike Maignan
+    (33, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Fikayo Tomori
+    (36, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Matteo Gabbia
+    (39, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Theo Hernandez
+    (40, 6, 'AC Milan',TRUE, 0, FALSE, 0, 0, FALSE), -- Davide Calabria
+    (42, 6, 'AC Milan',FALSE, 1, FALSE, 1, 0, FALSE), -- Alessandro Florenzi
+    (45, 6, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tijjani Reijnders
+    (48, 6, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tommaso Pobega
+    (49, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Rafael Leao
+    (51, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Christian Pulisic
+    (54, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Olivier Giroud
+    
+ -- Finale: Inter vs SSC Napoli (vincitore finale) 
+    (57, 7, 'Inter',FALSE, 0, FALSE, 0, 1, TRUE), -- Yann Sommer
+    (63, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
+    (65, 7, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Francesco Acerbi
+    (66, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
+    (68, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Federico Dimarco
+    (71, 7, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Hakan Çalhanoglu
+    (75, 7, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Nicolò Barella
+    (76, 7, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Davide Frattesi
+    (81, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Denzel Dumfries
+    (88, 7, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Marcus Thuram
+    (89, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marko Arnautovic
+    
+    (1, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 2, FALSE), -- Alex Meret
+    (7, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Leo Østigård
+    (8, 7, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Juan Jesus
+    (9, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Mathias Oliveira
+    (11, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, TRUE), -- Giovanni Di Lorenzo
+    (13, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Stanislav Lobotka
+    (16, 7, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Frank Anguissa
+    (18, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Jens Cajuste
+    (21, 7, 'SSC Napoli',FALSE, 1, FALSE, 1, 0, FALSE), -- Khvicha Kvaratskhelia
+    (22, 7, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Matteo Politano
+    (26, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE); -- Giovanni Simeone
