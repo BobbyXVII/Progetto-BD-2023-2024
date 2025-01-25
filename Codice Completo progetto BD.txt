@@ -72,7 +72,7 @@ CREATE TABLE STADIO (
 CREATE TABLE SQUADRA(
 nomeSquadra VARCHAR(30),
 annoFondazione INTEGER NOT NULL,
-campAppartenenza VARCHAR(30),
+citta VARCHAR(30) NOT NULL,
 nazionalita VARCHAR(30) NOT NULL,
 nomeStadio VARCHAR(30) NOT NULL,
 PRIMARY KEY(nomeSquadra),
@@ -165,44 +165,22 @@ FOREIGN KEY (ID_Rosa) REFERENCES ROSA(ID_Rosa)
 );
 
 
+CREATE DOMAIN DOMtipAzione AS VARCHAR(15)
+CHECK (VALUE IN ('Ammonizione', 'Goal', 'Infortunio', 'Cambio_Entrata', 'Cambio_Uscita', 'Capitano'));
+
+
 CREATE TABLE COMPETE (
 ID SERIAL,
 ID_Partita INTEGER,
 nomeSquadra VARCHAR(30) NOT NULL,
-cartellinoRosso BOOL,
-cartelliniGialli INTEGER,
-Infortunato BOOL,
-goalEseguiti INTEGER,
-goalSubiti INTEGER,
-capitano BOOL,
-CONSTRAINT CHeckMaxCartellini CHECK (cartelliniGialli <= 2),
+tipoAzione DOMtipAzione,
+minutaggio INTEGER,
 FOREIGN KEY (ID) REFERENCES PERSONA(ID),
 FOREIGN KEY (ID_Partita,nomeSquadra) REFERENCES PARTITA(ID_Partita,nomeSquadra)
 );
 
---popolamento
-CREATE OR REPLACE FUNCTION checkCamp()
-RETURNS TRIGGER AS $$
-DECLARE 
-    CampAnalizzato int;
-BEGIN
-    SELECT COUNT(*) INTO CampAnalizzato
-    FROM Competizione
-    WHERE nomeCompetizione = NEW.campAppartenenza 
-    AND Competizione.nazionalita = NEW.nazionalita;
 
-    IF CampAnalizzato = 0 THEN 
-        RAISE EXCEPTION 'Un eccezione è stata violata: Il campionato !';
-    END IF;
 
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER checkSquadraCamp 
-BEFORE INSERT ON SQUADRA 
-FOR EACH ROW 
-EXECUTE FUNCTION checkCamp();
 
 CREATE OR REPLACE FUNCTION SearchPosition()
 RETURNS TRIGGER AS $$
@@ -461,69 +439,124 @@ EXECUTE FUNCTION ExistRoleAndPlay();
 CREATE OR REPLACE FUNCTION UpdatePlayerCareer()
 RETURNS TRIGGER AS $$
 DECLARE 
-    isGoalKeeper BOOLEAN;
-    goal_segnati INTEGER;
-	goal_subiti_dall_avversaria INTEGER;
-    ResultMatch INTEGER;
+    CountCartelliniGialli INTEGER;
+    avversarioPortiereID INTEGER;
+    squadraAvversaria VARCHAR(30);
+    secondoPortiereID INTEGER;
+	ControlloCambioRiuscito INTEGER;
 BEGIN
-    IF NEW.cartellinoRosso IS TRUE THEN
+	
+	IF NEW.tipoAzione = 'Cambio_Uscita' THEN
+		SELECT 1 INTO ControlloCambioRiuscito
+		FROM COMPETE 
+		WHERE nomeSquadra = NEW.nomeSquadra
+		AND minutaggio = NEW.minutaggio
+		AND tipoAzione = 'Cambio_Entrata'
+		AND ID_Partita = NEW.ID_Partita;
+		
+		IF ControlloCambioRiuscito IS NULL THEN
+		RAISE EXCEPTION 'Il cambio non ha riportato un membro entrante nella partita';
+		END IF;
+	END IF;
+	
+    -- Gestione delle ammonizioni
+    IF NEW.tipoAzione = 'Ammonizione' THEN
+        SELECT count(*) INTO CountCartelliniGialli
+        FROM COMPETE
+        WHERE ID = NEW.ID
+          AND tipoAzione = 'Ammonizione';
+
+        IF CountCartelliniGialli > 1 THEN
+            UPDATE CARRIERA
+            SET cartelliniRossiAnnuali = cartelliniRossiAnnuali + 1
+            WHERE ID = NEW.ID;
+        END IF;
+
         UPDATE CARRIERA
-        SET cartelliniRossiAnnuali = cartelliniRossiAnnuali + 1
-        WHERE NEW.ID = CARRIERA.ID;
+        SET cartelliniGialliAnnuali = cartelliniGialliAnnuali + 1
+        WHERE ID = NEW.ID;
     END IF;
 
-    IF NEW.cartelliniGialli > 0 THEN
-        UPDATE CARRIERA
-        SET cartelliniGialliAnnuali = cartelliniGialliAnnuali + NEW.cartelliniGialli
-        WHERE NEW.ID = CARRIERA.ID;
-    END IF;
-
-    IF NEW.infortunato IS TRUE THEN
+    -- Gestione degli infortuni
+    IF NEW.tipoAzione = 'Infortunio' THEN
         UPDATE CARRIERA
         SET infortuniAnnuali = infortuniAnnuali + 1
-        WHERE NEW.ID = CARRIERA.ID;
+        WHERE ID = NEW.ID;
     END IF;
 
-    IF NEW.goalEseguiti > 0 THEN
+    -- Gestione dei goal
+    IF NEW.tipoAzione = 'Goal' THEN
+        -- Incrementa i goal segnati per il giocatore che ha effettuato il goal
         UPDATE CARRIERA
-        SET goalEseguitiAnnuali = goalEseguitiAnnuali + NEW.goalEseguiti
-        WHERE NEW.ID = CARRIERA.ID;
-    END IF;
+        SET goalEseguitiAnnuali = goalEseguitiAnnuali + 1
+        WHERE ID = NEW.ID;
 
-    SELECT EXISTS (
-        SELECT 1
-        FROM GIOCA
-        WHERE NEW.ID = GIOCA.ID
-        AND abbrRuolo = 'POR'
-    ) INTO isGoalKeeper;
+        -- Determina la squadra avversaria
+        SELECT DISTINCT C.nomeSquadra
+        INTO squadraAvversaria
+        FROM COMPETE AS C
+        WHERE C.ID_Partita = NEW.ID_Partita
+          AND C.nomeSquadra <> NEW.nomeSquadra;
 
-    IF isGoalKeeper THEN
-    SELECT 
-    SUM(c1.goalEseguiti),
-    SUM(c2.goalSubiti) INTO goal_segnati, goal_subiti_dall_avversaria
-	FROM PARTITA p1
-	JOIN COMPETE c1 ON p1.ID_Partita = c1.ID_Partita
-	JOIN PARTITA p2 ON p1.ID_Partita = p2.ID_Partita AND p1.nomeSquadra <> p2.nomeSquadra
-	JOIN COMPETE c2 ON p2.ID_Partita = c2.ID_Partita
-	WHERE p1.inCasa = TRUE;
+        -- Trova il portiere titolare della squadra avversaria
+        SELECT FP.ID_Calciatore
+        INTO avversarioPortiereID
+        FROM FA_PARTE AS FP
+        JOIN ROSA AS R ON FP.ID_Rosa = R.ID_Rosa
+        WHERE R.nomeSquadra = squadraAvversaria
+          AND FP.Posizione = 'Portiere'
+          AND FP.titolare = TRUE
+          AND NOT EXISTS (
+              SELECT 1
+              FROM COMPETE
+              WHERE ID = FP.ID_Calciatore
+                AND tipoAzione = 'Cambio_Uscita'
+                AND minutaggio <= NEW.minutaggio
+          );
 
-    IF goal_segnati < goal_subiti_dall_avversaria THEN
-		RAISE EXCEPTION 'Il totale di goal subiti non è corretto con il risultato ottenuto dalla partita!';
-	END IF;	
-	
-        UPDATE CARRIERA
-        SET goalSubitiAnnuali = goalSubitiAnnuali + NEW.goalSubiti
-        WHERE NEW.ID = CARRIERA.ID;
+        -- Se il portiere titolare è uscito, trova il secondo portiere
+        IF avversarioPortiereID IS NULL THEN
+            SELECT FP.ID_Calciatore
+            INTO secondoPortiereID
+            FROM FA_PARTE AS FP
+            JOIN ROSA AS R ON FP.ID_Rosa = R.ID_Rosa
+            WHERE R.nomeSquadra = squadraAvversaria
+              AND FP.Posizione = 'Portiere'
+              AND FP.titolare = FALSE
+              AND EXISTS (
+                  SELECT 1
+                  FROM COMPETE
+                  WHERE ID = FP.ID_Calciatore
+                    AND tipoAzione = 'Cambio_Entrata'
+                    AND minutaggio <= NEW.minutaggio
+              )
+              LIMIT 1; -- Trova il primo portiere valido
+        END IF;
+
+        -- Determina quale portiere aggiornare
+        IF avversarioPortiereID IS NOT NULL THEN
+            -- Aggiorna il portiere titolare
+            UPDATE CARRIERA
+            SET goalSubitiAnnuali = goalSubitiAnnuali + 1
+            WHERE ID = avversarioPortiereID;
+        ELSIF secondoPortiereID IS NOT NULL THEN
+            -- Aggiorna il secondo portiere
+            UPDATE CARRIERA
+            SET goalSubitiAnnuali = goalSubitiAnnuali + 1
+            WHERE ID = secondoPortiereID;
+        END IF;
     END IF;
 
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger associato alla tabella COMPETE
 CREATE TRIGGER updateCareers
 AFTER INSERT ON COMPETE
 FOR EACH ROW
 EXECUTE FUNCTION UpdatePlayerCareer();
+
 
 CREATE OR REPLACE FUNCTION CheckDataCarriera()
 RETURNS TRIGGER AS $$
@@ -733,11 +766,11 @@ VALUES
 	('Santiago Bernabéu',81044),
 	('Wembley Stadium',90000);
 	
-INSERT INTO SQUADRA (nomeSquadra, annoFondazione, campAppartenenza, nazionalita, nomeStadio)
+INSERT INTO SQUADRA (nomeSquadra, annoFondazione, citta, nazionalita, nomeStadio)
 VALUES
-		('SSC Napoli',1926,'Serie A','Italia','Stadio Diego Armando Maradona'),
-		('AC Milan',1899,'Serie A','Italia','Giuseppe Meazza'),
-		('Inter',1908,'Serie A','Italia','Giuseppe Meazza');
+		('SSC Napoli',1926,'Napoli','Italia','Stadio Diego Armando Maradona'),
+		('AC Milan',1899,'Milano','Italia','Giuseppe Meazza'),
+		('Inter',1908,'Milano','Italia','Giuseppe Meazza');
 		
 		INSERT INTO skills (nomeSkill, descrizione) 
 VALUES 
@@ -1407,131 +1440,43 @@ VALUES
     ('Coppa Italia', '2023/2024', 'Inter', 1), -- Vincitore
     ('Coppa Italia', '2023/2024', 'AC Milan', 3); -- Quarti di finale
 
-INSERT INTO COMPETE (ID, ID_Partita, nomeSquadra, cartellinoRosso, cartelliniGialli, Infortunato, goalEseguiti, goalSubiti, capitano)
+-- SSC Napoli vs AC Milan (Serie A, ID_Partita = 1)
+INSERT INTO COMPETE (ID, ID_Partita, nomeSquadra, tipoAzione, minutaggio)
 VALUES
-	-- AC Milan vs Inter - Serie A
-    (29, 3, 'AC Milan',FALSE, 0, FALSE, 0, 3,TRUE), -- Mike Maignan
-    (33, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Fikayo Tomori
-    (36, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Matteo Gabbia
-    (39, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Theo Hernandez
-    (40, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Davide Calabria
-    (42, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Alessandro Florenzi
-    (45, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Tijjani Reijnders
-    (48, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Tommaso Pobega
-    (49, 3, 'AC Milan',FALSE, 1, FALSE, 0, 0,FALSE), -- Rafael Leao
-    (51, 3, 'AC Milan',FALSE, 0, FALSE, 0, 0,FALSE), -- Christian Pulisic
-    (54, 3, 'AC Milan',FALSE, 0, FALSE, 1, 0,FALSE), -- Olivier Giroud
-    
-    (57, 3, 'Inter',FALSE, 0, FALSE, 0, 1, TRUE), -- Yann Sommer
-    (63, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
-    (65, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Francesco Acerbi
-    (66, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
-    (68, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Federico Dimarco
-    (71, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Hakan Çalhanoglu
-    (75, 3, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Nicolò Barella
-    (76, 3, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Frattesi
-    (81, 3, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Denzel Dumfries
-    (88, 3, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Marcus Thuram
-    (89, 3, 'Inter',FALSE, 1, FALSE, 1, 0, FALSE), -- Marko Arnautovic
+    (11, 1, 'SSC Napoli', 'Capitano', 0), -- Giovanni Di Lorenzo (capitano Napoli)
+    (40, 1, 'AC Milan', 'Capitano', 0), -- Davide Calabria (capitano Milan)
+    (17, 1, 'SSC Napoli', 'Cambio_Uscita', 60), -- Piotr Zieliński esce
+    (18, 1, 'SSC Napoli', 'Cambio_Entrata', 60), -- Jens Cajuste entra
+    (49, 1, 'AC Milan', 'Goal', 75), -- Rafael Leão segna
+    (9, 1, 'SSC Napoli', 'Ammonizione', 80); -- Mathias Oliveira ammonito
 
--- Semifinale: Inter vs AC Milan - Champions League
-    (57, 4, 'Inter',FALSE, 0, FALSE, 0, 2, TRUE), -- Yann Sommer
-    (63, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
-    (65, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Francesco Acerbi
-    (66, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
-    (68, 4, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Federico Dimarco
-    (71, 4, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Hakan Çalhanoglu
-    (75, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Nicolò Barella
-    (76, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Frattesi
-    (81, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Denzel Dumfries
-    (88, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marcus Thuram
-    (89, 4, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marko Arnautovic
-    
-    (29, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, TRUE), -- Mike Maignan
-    (33, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Fikayo Tomori
-    (36, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Matteo Gabbia
-    (39, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Theo Hernandez
-    (40, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Calabria
-    (42, 4, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Alessandro Florenzi
-    (45, 4, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tijjani Reijnders
-    (48, 4, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tommaso Pobega
-    (49, 4, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Rafael Leao
-    (51, 4, 'AC Milan',FALSE, 0, FALSE, 1, 0, FALSE), -- Christian Pulisic
-    (54, 4, 'AC Milan',FALSE, 0, FALSE, 1, 0, FALSE), -- Olivier Giroud
-    
- -- Finale: AC Milan vs SSC Napoli (vincitore finale)
-    (29, 5, 'AC Milan',FALSE, 0, FALSE, 0, 5, TRUE), -- Mike Maignan
-    (33, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Fikayo Tomori
-    (36, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Matteo Gabbia
-    (39, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Theo Hernandez
-    (40, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Calabria
-    (42, 5, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Alessandro Florenzi
-    (45, 5, 'AC Milan',FALSE, 0, FALSE, 1, 0, FALSE), -- Tijjani Reijnders
-    (48, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Pobega
-    (49, 5, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Rafael Leao
-    (51, 5, 'AC Milan',FALSE, 1, FALSE, 1, 0, FALSE), -- Christian Pulisic
-    (54, 5, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Olivier Giroud
-    
-    (1, 5, 'SSC Napoli',FALSE, 0, FALSE, 0, 2, FALSE), -- Alex Meret
-    (7, 5, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Leo Østigård
-    (8, 5, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Juan Jesus
-    (9, 5, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Mathias Oliveira
-    (11, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, TRUE), -- Giovanni Di Lorenzo
-    (13, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, FALSE), -- Stanislav Lobotka
-    (16, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, FALSE), -- Frank Anguissa
-    (18, 5, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Jens Cajuste
-    (21, 5, 'SSC Napoli',FALSE, 1, FALSE, 1, 0, FALSE), -- Khvicha Kvaratskhelia
-    (22, 5, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Matteo Politano
-    (26, 5, 'SSC Napoli',FALSE, 0, FALSE, 1, 0, FALSE), -- Giovanni Simeone
-    
+-- Inter vs SSC Napoli (Serie A, ID_Partita = 2)
+INSERT INTO COMPETE (ID, ID_Partita, nomeSquadra, tipoAzione, minutaggio)
+VALUES
+    (87, 2, 'Inter', 'Capitano', 0), -- Lautaro Martinez (capitano Inter)
+    (11, 2, 'SSC Napoli', 'Capitano', 0), -- Giovanni Di Lorenzo (capitano Napoli)
+    (25, 2, 'SSC Napoli', 'Goal', 30), -- Victor Osimhen segna
+    (75, 2, 'Inter', 'Ammonizione', 45), -- Nicolò Barella ammonito
+    (77, 2, 'Inter', 'Cambio_Uscita', 65), -- Henrikh Mkhitaryan esce
+    (78, 2, 'Inter', 'Cambio_Entrata', 65); -- Davy Klaassen entra
 
+-- AC Milan vs Inter (Serie A, ID_Partita = 3)
+INSERT INTO COMPETE (ID, ID_Partita, nomeSquadra, tipoAzione, minutaggio)
+VALUES
+    (40, 3, 'AC Milan', 'Capitano', 0), -- Davide Calabria (capitano Milan)
+    (87, 3, 'Inter', 'Capitano', 0), -- Lautaro Martinez (capitano Inter)
+    (88, 3, 'Inter', 'Goal', 50), -- Marcus Thuram segna
+    (87, 3, 'Inter', 'Goal', 85), -- Lautaro Martinez segna
+    (46, 3, 'AC Milan', 'Cambio_Uscita', 70), -- Ruben Loftus-Cheek esce
+    (44, 3, 'AC Milan', 'Cambio_Entrata', 70); -- Yacine Adli entra
 
--- Semifinale: Inter vs Milan
-    (57, 6, 'Inter',FALSE, 0, FALSE, 0, 1, TRUE), -- Yann Sommer
-    (63, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
-    (65, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Francesco Acerbi
-    (66, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
-    (68, 6, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Federico Dimarco
-    (71, 6, 'Inter',FALSE, 1, FALSE, 1, 0, FALSE), -- Hakan Çalhanoglu
-    (75, 6, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Nicolò Barella
-    (76, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Davide Frattesi
-    (81, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Denzel Dumfries
-    (88, 6, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Marcus Thuram
-    (89, 6, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marko Arnautovic
-   
-    (29, 6, 'AC Milan',FALSE, 0, FALSE, 0, 3, TRUE), -- Mike Maignan
-    (33, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Fikayo Tomori
-    (36, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Matteo Gabbia
-    (39, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Theo Hernandez
-    (40, 6, 'AC Milan',TRUE, 0, FALSE, 0, 0, FALSE), -- Davide Calabria
-    (42, 6, 'AC Milan',FALSE, 1, FALSE, 1, 0, FALSE), -- Alessandro Florenzi
-    (45, 6, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tijjani Reijnders
-    (48, 6, 'AC Milan',FALSE, 1, FALSE, 0, 0, FALSE), -- Tommaso Pobega
-    (49, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Rafael Leao
-    (51, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Christian Pulisic
-    (54, 6, 'AC Milan',FALSE, 0, FALSE, 0, 0, FALSE), -- Olivier Giroud
-    
- -- Finale: Inter vs SSC Napoli (vincitore finale) 
-    (57, 7, 'Inter',FALSE, 0, FALSE, 0, 1, TRUE), -- Yann Sommer
-    (63, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Yann Bisseck
-    (65, 7, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Francesco Acerbi
-    (66, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Tommaso Guercio
-    (68, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Federico Dimarco
-    (71, 7, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Hakan Çalhanoglu
-    (75, 7, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Nicolò Barella
-    (76, 7, 'Inter',FALSE, 1, FALSE, 0, 0, FALSE), -- Davide Frattesi
-    (81, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Denzel Dumfries
-    (88, 7, 'Inter',FALSE, 0, FALSE, 1, 0, FALSE), -- Marcus Thuram
-    (89, 7, 'Inter',FALSE, 0, FALSE, 0, 0, FALSE), -- Marko Arnautovic
-    
-    (1, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 2, FALSE), -- Alex Meret
-    (7, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Leo Østigård
-    (8, 7, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Juan Jesus
-    (9, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Mathias Oliveira
-    (11, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, TRUE), -- Giovanni Di Lorenzo
-    (13, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Stanislav Lobotka
-    (16, 7, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Frank Anguissa
-    (18, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE), -- Jens Cajuste
-    (21, 7, 'SSC Napoli',FALSE, 1, FALSE, 1, 0, FALSE), -- Khvicha Kvaratskhelia
-    (22, 7, 'SSC Napoli',FALSE, 1, FALSE, 0, 0, FALSE), -- Matteo Politano
-    (26, 7, 'SSC Napoli',FALSE, 0, FALSE, 0, 0, FALSE); -- Giovanni Simeone
+-- Inter vs AC Milan (Champions League, ID_Partita = 4)
+INSERT INTO COMPETE (ID, ID_Partita, nomeSquadra, tipoAzione, minutaggio)
+VALUES
+    (87, 4, 'Inter', 'Capitano', 0), -- Lautaro Martinez (capitano Inter)
+    (40, 4, 'AC Milan', 'Capitano', 0), -- Davide Calabria (capitano Milan)
+    (49, 4, 'AC Milan', 'Goal', 10), -- Rafael Leão segna
+    (51, 4, 'AC Milan', 'Goal', 80), -- Christian Pulisic segna
+    (75, 4, 'Inter', 'Ammonizione', 55), -- Nicolò Barella ammonito
+    (90, 4, 'Inter', 'Cambio_Entrata', 65), -- Alexis Sanchez entra
+    (88, 4, 'Inter', 'Cambio_Uscita', 65); -- Marcus Thuram esce
